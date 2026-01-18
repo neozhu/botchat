@@ -924,7 +924,7 @@ function MessageBubble({
     <div
       className={cn(
         "flex items-end gap-3",
-        isUser ? "flex-row" : "flex-row-reverse"
+        isUser ? "flex-row-reverse" : "flex-row"
       )}
     >
       <Avatar className="h-9 w-9">

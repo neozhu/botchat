@@ -1,6 +1,7 @@
 import { convertToModelMessages, streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getOpenAIModelId } from "@/lib/ai/openai";
 
 export const maxDuration = 30;
 
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
 
   const modelMessages = await convertToModelMessages(messages);
   const result = streamText({
-    model: openai("gpt-5-mini"),
+    model: openai(getOpenAIModelId()),
     system,
     messages: modelMessages,
   });

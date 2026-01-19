@@ -1,5 +1,6 @@
 import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { getOpenAIModelId } from "@/lib/ai/openai";
 import { z } from "zod";
 
 export const maxDuration = 30;
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     .join("\n");
 
   const { output } = await generateText({
-    model: openai("gpt-5-mini"),
+    model: openai(getOpenAIModelId()),
     prompt,
     output: Output.object({
       schema: z.object({
@@ -59,4 +60,3 @@ export async function POST(request: Request) {
 
   return Response.json(output);
 }
-

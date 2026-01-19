@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
 
-## Getting Started
+# Botchat
 
-First, run the development server:
+**A clean, fast chat dashboard with expert personas, streaming replies, attachments, and readable code blocks.**
+
+Built with **Next.js (App Router)** + **Vercel AI SDK** + **Supabase**.
+
+</div>
+
+## What you get
+
+- **Expert personas**: switch between different “experts” with their own system prompts.
+- **Multi-session chat**: sessions list + titles + last-message preview.
+- **Streaming responses**: responsive UI while the model streams tokens.
+- **Attachments**: upload images/files to Supabase Storage and send them with messages.
+- **Markdown + code blocks**: readable rendering with syntax highlighting.
+
+## Quickstart (local)
+
+### 1) Configure env
+
+Create `.env.local`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+cp .env.local.example .env.local
+```
+
+Required:
+
+- `OPENAI_API_KEY` – your OpenAI API key
+- `OPENAI_MODEL` – e.g. `gpt-5-mini` (model is not hardcoded in code)
+
+Supabase (recommended for sessions/experts/attachments):
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`)
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` (required for attachment uploads + message persistence routes)
+
+### 2) Run
+
+```bash
+bun install
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a Supabase project.
+2. Run `supabase/schema.sql` in the Supabase SQL Editor (this project uses a simple “no-auth” RLS policy for anon read/write).
+3. (Optional) Attachments are stored in a public bucket named `chat-attachments` and created automatically on first upload.
 
-## Learn More
+## Docker
 
-To learn more about Next.js, take a look at the following resources:
+This repo includes a production Docker build for the Next.js app:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+docker compose up -d --build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+App is exposed at `http://localhost:3202` (mapped from container `3000`).
 
-## Deploy on Vercel
+Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, and your Supabase vars in your deployment platform or `docker-compose.yml`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/` – Next.js routes (UI + API routes)
+- `components/botchat/` – chat UI (sessions, experts, input, panels)
+- `components/ai-elements/` – AI-friendly UI primitives (rendering, message building blocks)
+- `lib/` – shared utilities + Supabase clients
+- `supabase/schema.sql` – database schema + RLS policies
+
+## Common scripts
+
+```bash
+bun dev       # local dev
+bun run build # production build
+bun start     # run production server on :3000
+```

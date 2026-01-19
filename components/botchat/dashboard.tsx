@@ -135,6 +135,10 @@ function formatRelativeTime(thenIso: string, nowMs: number) {
 export default function BotchatDashboard() {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const savedMessageIdsRef = useRef<Set<string>>(new Set());
+  const messagesSessionIdRef = useRef<string | null>(null);
+  const generationSessionIdRef = useRef<string | null>(null);
+  const inFlightAbortRef = useRef<AbortController | null>(null);
+  const sessionLoadTokenRef = useRef(0);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isLoadingExperts, setIsLoadingExperts] = useState(true);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
@@ -147,10 +151,12 @@ export default function BotchatDashboard() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
 
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, sendMessage, status, setMessages, stop } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
     onFinish: ({ message }) => {
-      if (!activeSessionId) return;
+      const targetSessionId =
+        generationSessionIdRef.current ?? activeSessionId ?? null;
+      if (!targetSessionId) return;
       const text = messageText(message).trim();
       if (!text) return;
 
@@ -158,7 +164,7 @@ export default function BotchatDashboard() {
       setSessions((prev) =>
         prev
           .map((s) =>
-            s.id === activeSessionId
+            s.id === targetSessionId
               ? {
                   ...s,
                   last_message: text.slice(0, 500),
@@ -200,6 +206,25 @@ export default function BotchatDashboard() {
   const providerOpen = isMobile ? false : sidebarOpen;
 
   const handleSelectSession = async (session: SessionRow) => {
+    const token = ++sessionLoadTokenRef.current;
+
+    try {
+      inFlightAbortRef.current?.abort();
+      inFlightAbortRef.current = null;
+      setIsUploadingAttachments(false);
+      if (status !== "ready") await stop();
+    } catch {
+      // Best-effort abort; switching sessions should still work.
+    }
+
+    if (token !== sessionLoadTokenRef.current) return;
+
+    messagesSessionIdRef.current = null;
+    savedMessageIdsRef.current = new Set();
+    setMessages([]);
+    setPendingFiles([]);
+    setInput("");
+
     setActiveSessionId(session.id);
     setActiveExpertId(session.expert_id);
 
@@ -218,13 +243,23 @@ export default function BotchatDashboard() {
       };
     }) as UIMessage[];
 
+    if (token !== sessionLoadTokenRef.current) return;
+
+    messagesSessionIdRef.current = session.id;
     savedMessageIdsRef.current = new Set(uiMessages.map((m) => m.id));
     setMessages(uiMessages);
-    setInput("");
-    setPendingFiles([]);
   };
 
   const handleDeleteSession = async (session: SessionRow) => {
+    try {
+      inFlightAbortRef.current?.abort();
+      inFlightAbortRef.current = null;
+      setIsUploadingAttachments(false);
+      if (status !== "ready") await stop();
+    } catch {
+      // Best-effort abort; continue deletion.
+    }
+
     if (deletingSessionIds.has(session.id)) return;
 
     setDeletingSessionIds((prev) => new Set(prev).add(session.id));
@@ -267,6 +302,7 @@ export default function BotchatDashboard() {
     const nextSession = remaining[0] ?? null;
     if (!nextSession) {
       setActiveSessionId(null);
+      messagesSessionIdRef.current = null;
       savedMessageIdsRef.current = new Set();
       setMessages([]);
       setInput("");
@@ -278,6 +314,15 @@ export default function BotchatDashboard() {
   };
 
   const handleCreateSessionForExpert = async (expertId: string) => {
+    try {
+      inFlightAbortRef.current?.abort();
+      inFlightAbortRef.current = null;
+      setIsUploadingAttachments(false);
+      if (status !== "ready") await stop();
+    } catch {
+      // Best-effort abort; creating a new session should still work.
+    }
+
     setActiveExpertId(expertId);
 
     const { data: newSession } = await supabase
@@ -291,6 +336,7 @@ export default function BotchatDashboard() {
     const session = newSession as unknown as SessionRow;
     setSessions((prev) => [session, ...prev]);
     setActiveSessionId(session.id);
+    messagesSessionIdRef.current = session.id;
     savedMessageIdsRef.current = new Set();
     setMessages([]);
     setInput("");
@@ -371,6 +417,7 @@ export default function BotchatDashboard() {
             };
           }) as UIMessage[];
 
+          messagesSessionIdRef.current = current.id;
           savedMessageIdsRef.current = new Set(uiMessages.map((m) => m.id));
           setMessages(uiMessages);
         } else if (loadedExperts.length > 0) {
@@ -390,6 +437,7 @@ export default function BotchatDashboard() {
             setSessions([session]);
             setActiveSessionId(session.id);
             setActiveExpertId(session.expert_id);
+            messagesSessionIdRef.current = session.id;
             savedMessageIdsRef.current = new Set();
             setMessages([]);
           }
@@ -409,7 +457,8 @@ export default function BotchatDashboard() {
   }, [setMessages, supabase]);
 
   useEffect(() => {
-    if (!activeSessionId) return;
+    const sessionId = messagesSessionIdRef.current;
+    if (!sessionId) return;
     if (messages.length === 0) return;
 
     const savedIds = savedMessageIdsRef.current;
@@ -440,7 +489,7 @@ export default function BotchatDashboard() {
             headers: { "content-type": "application/json" },
             signal: abort.signal,
             body: JSON.stringify({
-              sessionId: activeSessionId,
+              sessionId,
               messages: toUpsert,
             }),
           });
@@ -462,9 +511,13 @@ export default function BotchatDashboard() {
       clearTimeout(timeout);
       abort.abort();
     };
-  }, [activeSessionId, messages]);
+  }, [messages]);
 
-  const uploadAttachments = async (sessionId: string, files: File[]) => {
+  const uploadAttachments = async (
+    sessionId: string,
+    files: File[],
+    signal: AbortSignal
+  ) => {
     const formData = new FormData();
     formData.set("sessionId", sessionId);
     files.forEach((file) => formData.append("files", file, file.name));
@@ -472,6 +525,7 @@ export default function BotchatDashboard() {
     const response = await fetch("/api/attachments/upload", {
       method: "POST",
       body: formData,
+      signal,
     });
 
     if (!response.ok) {
@@ -490,65 +544,82 @@ export default function BotchatDashboard() {
     event.preventDefault();
     const trimmed = input.trim();
     const hasText = trimmed.length > 0;
-    const hasFiles = pendingFiles.length > 0;
+    const filesSnapshot = pendingFiles;
+    const hasFiles = filesSnapshot.length > 0;
     if ((!hasText && !hasFiles) || status !== "ready") return;
     if (!activeSessionId || !activeExpertId) return;
 
-    setSessions((prev) => {
-      const now = new Date().toISOString();
-      const attachmentSummary = hasFiles
-        ? pendingFiles.length === 1
-          ? `Attachment: ${pendingFiles[0]?.name ?? "file"}`
-          : `Attachments: ${pendingFiles[0]?.name ?? "file"} +${
-              pendingFiles.length - 1
-            }`
-        : null;
-      const previewText = hasText ? trimmed : attachmentSummary ?? "";
-      return prev
-        .map((s) =>
-          s.id === activeSessionId
-            ? {
-                ...s,
-                title:
-                  s.title === "New chat"
-                    ? previewText.slice(0, 60) || s.title
-                    : s.title,
-                last_message: previewText.slice(0, 500),
-                updated_at: now,
-              }
-            : s
-        )
-        .sort(
-          (a, b) =>
-            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-        );
-    });
+    const sessionIdAtSend = activeSessionId;
+    const expertIdAtSend = activeExpertId;
+    const abort = new AbortController();
+
+    inFlightAbortRef.current?.abort();
+    inFlightAbortRef.current = abort;
 
     void (async () => {
       try {
         setIsUploadingAttachments(hasFiles);
+        generationSessionIdRef.current = sessionIdAtSend;
+        messagesSessionIdRef.current = sessionIdAtSend;
 
         const uploadedFiles = hasFiles
-          ? await uploadAttachments(activeSessionId, pendingFiles)
+          ? await uploadAttachments(sessionIdAtSend, filesSnapshot, abort.signal)
           : undefined;
+
+        if (abort.signal.aborted) return;
+        if (activeSessionId !== sessionIdAtSend) return;
+
+        const now = new Date().toISOString();
+        const attachmentSummary = hasFiles
+          ? filesSnapshot.length === 1
+            ? `Attachment: ${filesSnapshot[0]?.name ?? "file"}`
+            : `Attachments: ${filesSnapshot[0]?.name ?? "file"} +${
+                filesSnapshot.length - 1
+              }`
+          : null;
+        const previewText = hasText ? trimmed : attachmentSummary ?? "";
+
+        setSessions((prev) =>
+          prev
+            .map((s) =>
+              s.id === sessionIdAtSend
+                ? {
+                    ...s,
+                    title:
+                      s.title === "New chat"
+                        ? previewText.slice(0, 60) || s.title
+                        : s.title,
+                    last_message: previewText.slice(0, 500),
+                    updated_at: now,
+                  }
+                : s
+            )
+            .sort(
+              (a, b) =>
+                new Date(b.updated_at).getTime() -
+                new Date(a.updated_at).getTime()
+            )
+        );
 
         if (hasText) {
           await sendMessage(
             { text: trimmed, files: uploadedFiles },
-            { body: { sessionId: activeSessionId, expertId: activeExpertId } }
+            { body: { sessionId: sessionIdAtSend, expertId: expertIdAtSend } }
           );
         } else if (uploadedFiles) {
           await sendMessage(
             { files: uploadedFiles },
-            { body: { sessionId: activeSessionId, expertId: activeExpertId } }
+            { body: { sessionId: sessionIdAtSend, expertId: expertIdAtSend } }
           );
         }
 
         setInput("");
         setPendingFiles([]);
       } catch (error) {
+        if ((error as { name?: string }).name === "AbortError") return;
         console.error("Failed to send message with attachments", error);
       } finally {
+        if (inFlightAbortRef.current === abort) inFlightAbortRef.current = null;
         setIsUploadingAttachments(false);
       }
     })();

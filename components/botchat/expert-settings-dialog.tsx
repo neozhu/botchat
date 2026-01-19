@@ -26,6 +26,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
+import { z } from "zod";
 
 type ExpertRow = {
   id: string;
@@ -49,6 +50,11 @@ type ExpertDraft = {
   suggestion_question: string;
   sort_order: number;
 };
+
+const expertGenerationSchema = z.object({
+  system_prompt: z.string().min(1),
+  suggestion_question: z.string().min(1),
+});
 
 function slugify(value: string) {
   return value
@@ -321,14 +327,11 @@ export function ExpertSettingsDialog({
         throw new Error(await response.text());
       }
 
-      const data = (await response.json()) as {
-        system_prompt?: string;
-        suggestion_question?: string;
-      };
-
-      if (!data.system_prompt || !data.suggestion_question) {
+      const parsed = expertGenerationSchema.safeParse(await response.json());
+      if (!parsed.success) {
         throw new Error("Invalid AI response.");
       }
+      const data = parsed.data;
 
       setDraft((prev) => ({
         ...prev,

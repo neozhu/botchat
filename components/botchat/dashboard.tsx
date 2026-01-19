@@ -191,7 +191,7 @@ export default function BotchatDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const activeExpert = useMemo(
-    () => experts.find((expert) => expert.id === activeExpertId),
+    () => experts.find((expert) => expert.id === activeExpertId) ?? null,
     [experts, activeExpertId]
   );
 

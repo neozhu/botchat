@@ -28,6 +28,7 @@ type SessionItem = {
   expert_id: string;
   title: string;
   last_message: string | null;
+  created_at: string;
   updated_at: string;
 };
 

@@ -8,6 +8,8 @@ Built with **Next.js (App Router)** + **Vercel AI SDK** + **Supabase**.
 
 </div>
 
+![](/docs/screenshot.png)
+
 ## What you get
 
 - **Expert personas**: switch between different “experts” with their own system prompts.

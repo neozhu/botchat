@@ -135,7 +135,7 @@ const MessageBubble = memo(function MessageBubble({
   }>;
 
   return (
-    <div className={cn("flex items-end gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
+    <div className={cn("flex items-end gap-3", isUser ? "flex-row" : "flex-row-reverse")}>
       <Avatar className="h-9 w-9">
         <AvatarFallback
           className={cn(

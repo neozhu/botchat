@@ -151,7 +151,13 @@ export default function BotchatDashboard() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
 
+  const [experts, setExperts] = useState<ExpertRow[]>([]);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [activeExpertId, setActiveExpertId] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
   const { messages, sendMessage, status, setMessages, stop } = useChat({
+    id: activeSessionId ?? "new",
     transport: new DefaultChatTransport({ api: "/api/chat" }),
     onFinish: ({ message }) => {
       const targetSessionId =
@@ -183,11 +189,6 @@ export default function BotchatDashboard() {
   const [input, setInput] = useState("");
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  const [experts, setExperts] = useState<ExpertRow[]>([]);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [activeExpertId, setActiveExpertId] = useState<string | null>(null);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const activeExpert = useMemo(
     () => experts.find((expert) => expert.id === activeExpertId),
@@ -643,6 +644,7 @@ export default function BotchatDashboard() {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         formatRelativeTime={formatRelativeTime}
+        onExpertsUpdated={setExperts}
       />
       <ChatPanel
         botName={botName}

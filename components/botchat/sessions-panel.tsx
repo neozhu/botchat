@@ -1,20 +1,27 @@
 "use client";
 
+import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { ExpertSettingsDialog } from "@/components/botchat/expert-settings-dialog";
 import { cn } from "@/lib/utils";
-import { Loader2, PanelLeft, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, PanelLeft, Settings, SlidersHorizontal, Trash2 } from "lucide-react";
 
 type SessionItem = {
   id: string;
@@ -35,6 +42,19 @@ export type SessionsPanelProps = {
   onSelectSession: (session: SessionItem) => void | Promise<void>;
   onDeleteSession: (session: SessionItem) => void | Promise<void>;
   formatRelativeTime: (thenIso: string, nowMs: number) => string;
+  onExpertsUpdated?: (
+    experts: Array<{
+      id: string;
+      slug: string;
+      name: string;
+      agent_name: string;
+      description: string | null;
+      system_prompt: string;
+      suggestion_question: string | null;
+      sort_order: number;
+      created_at: string;
+    }>
+  ) => void;
 };
 
 export function SessionsPanel({
@@ -48,7 +68,10 @@ export function SessionsPanel({
   onSelectSession,
   onDeleteSession,
   formatRelativeTime,
+  onExpertsUpdated,
 }: SessionsPanelProps) {
+  const [expertDialogOpen, setExpertDialogOpen] = useState(false);
+
   return (
     <Sidebar
       collapsible="icon"
@@ -176,7 +199,52 @@ export function SessionsPanel({
               })}
         </SidebarMenu>
       </SidebarContent>
+
+      <SidebarFooter className="mt-auto px-3 pb-4">
+        <SidebarMenu className="gap-1">
+          <Collapsible defaultOpen={false} className="group/settings">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton
+                  tooltip="Settings"
+                  className={cn(
+                    "rounded-2xl px-3 py-2.5",
+                    "hover:bg-white/70",
+                    "group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center"
+                  )}
+                >
+                  <Settings className="h-4 w-4" />
+                  <span className="font-medium group-data-[collapsible=icon]:hidden">
+                    Settings
+                  </span>
+                  <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]/settings:rotate-180 group-data-[collapsible=icon]:hidden" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub className="mt-1">
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild>
+                      <button
+                        type="button"
+                        onClick={() => setExpertDialogOpen(true)}
+                      >
+                        <SlidersHorizontal className="h-4 w-4" />
+                        <span className="text-xs">Expert System</span>
+                      </button>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
+        </SidebarMenu>
+
+        <ExpertSettingsDialog
+          open={expertDialogOpen}
+          onOpenChange={setExpertDialogOpen}
+          onExpertsUpdated={onExpertsUpdated}
+        />
+      </SidebarFooter>
     </Sidebar>
   );
 }
-

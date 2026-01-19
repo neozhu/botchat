@@ -2,7 +2,7 @@
 
 import type { UIMessage } from "ai";
 import type { FormEvent } from "react";
-import { memo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import {
   Conversation,
@@ -34,6 +34,7 @@ import {
   Send,
   Smile,
   Wand2,
+  X,
 } from "lucide-react";
 
 type ExpertItem = {
@@ -64,6 +65,9 @@ export type ChatPanelProps = {
   setInput: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCreateSessionForExpert: (expertId: string) => void | Promise<void>;
+  pendingFiles: File[];
+  setPendingFiles: (files: File[] | ((prev: File[]) => File[])) => void;
+  isUploadingAttachments?: boolean;
 };
 
 function messageText(message: UIMessage) {
@@ -82,10 +86,14 @@ function ToolbarIcon({
   icon: Icon,
   label,
   highlight,
+  onClick,
+  disabled,
 }: {
   icon: typeof MessageCircle;
   label: string;
   highlight?: boolean;
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <Tooltip>
@@ -94,10 +102,12 @@ function ToolbarIcon({
           type="button"
           size="icon"
           variant="ghost"
+          disabled={disabled}
           className={cn(
             "h-9 w-9 rounded-full",
             highlight && "bg-[var(--accent-line)]/15 text-[var(--accent-line)]"
           )}
+          onClick={onClick}
         >
           <Icon className="h-4 w-4" />
         </Button>
@@ -231,7 +241,40 @@ export function ChatPanel({
   setInput,
   onSubmit,
   onCreateSessionForExpert,
+  pendingFiles,
+  setPendingFiles,
+  isUploadingAttachments,
 }: ChatPanelProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previews = useMemo(
+    () =>
+      pendingFiles.map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+      })),
+    [pendingFiles]
+  );
+
+  useEffect(() => {
+    return () => {
+      previews.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+  }, [previews]);
+
+  const canSend = status === "ready" && !isUploadingAttachments;
+
+  const totalBytes = useMemo(
+    () => pendingFiles.reduce((sum, file) => sum + file.size, 0),
+    [pendingFiles]
+  );
+
+  const attachmentSummary = useMemo(() => {
+    if (pendingFiles.length === 0) return null;
+    const count = pendingFiles.length;
+    const mb = totalBytes / (1024 * 1024);
+    return `${count} file${count === 1 ? "" : "s"} • ${mb.toFixed(1)} MB`;
+  }, [pendingFiles.length, totalBytes]);
+
   return (
     <SidebarInset className="h-dvh overflow-hidden p-4 lg:p-6">
       <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col">
@@ -355,6 +398,89 @@ export function ChatPanel({
           <div className="px-8 pb-6">
             <form onSubmit={onSubmit} className="space-y-4">
               <div className="rounded-[24px] border border-white/70 bg-white/80 p-4 shadow-[0_18px_40px_-30px_rgba(20,20,60,0.45)]">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    if (files.length === 0) return;
+                    setPendingFiles((prev) => [...prev, ...files]);
+                    event.currentTarget.value = "";
+                  }}
+                />
+
+                {pendingFiles.length > 0 ? (
+                  <div className="mb-4 rounded-2xl border border-black/10 bg-white/60 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-medium text-foreground/70">
+                        Attachments
+                      </p>
+                      {attachmentSummary ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          {attachmentSummary}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                      {previews.map(({ file, url }) => {
+                        const isImage = file.type.startsWith("image/");
+                        return (
+                          <div
+                            key={`${file.name}-${file.lastModified}-${file.size}`}
+                            className="group relative w-36 shrink-0 overflow-hidden rounded-xl border border-black/10 bg-white"
+                          >
+                            <div className="relative h-24 w-full bg-muted/40">
+                              {isImage ? (
+                                <Image
+                                  src={url}
+                                  alt={file.name}
+                                  fill
+                                  className="object-cover"
+                                  loader={({ src }) => src}
+                                  unoptimized
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center px-3 text-center text-[11px] font-medium text-foreground/70">
+                                  {file.name}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 px-3 py-2">
+                              <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                                {file.name}
+                              </p>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 rounded-full opacity-70 hover:bg-red-500/10 hover:text-red-600 hover:opacity-100"
+                                onClick={() => {
+                                  setPendingFiles((prev) =>
+                                    prev.filter(
+                                      (f) =>
+                                        !(
+                                          f.name === file.name &&
+                                          f.size === file.size &&
+                                          f.lastModified === file.lastModified
+                                        )
+                                    )
+                                  );
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
                 <Textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
@@ -372,13 +498,18 @@ export function ChatPanel({
                     <ToolbarIcon icon={MessageCircle} label="Message type" />
                     <ToolbarIcon icon={Mic} label="Voice note" />
                     <ToolbarIcon icon={Hash} label="Topic tags" />
-                    <ToolbarIcon icon={Paperclip} label="Attach files" />
+                    <ToolbarIcon
+                      icon={Paperclip}
+                      label="Attach files"
+                      disabled={!canSend}
+                      onClick={() => fileInputRef.current?.click()}
+                    />
                     <ToolbarIcon icon={Smile} label="Emoji" />
                     <ToolbarIcon icon={Wand2} label="AI assist" highlight />
                   </div>
                   <Button
                     type="submit"
-                    disabled={status !== "ready"}
+                    disabled={!canSend}
                     className="rounded-full bg-black px-6 text-sm text-white hover:bg-black/90 disabled:opacity-60"
                   >
                     Send

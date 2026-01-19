@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import type { UIMessage } from "ai";
+import type { FileUIPart, UIMessage } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { ChatPanel } from "@/components/botchat/chat-panel";
@@ -144,6 +144,8 @@ export default function BotchatDashboard() {
   const [removingSessionIds, setRemovingSessionIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
 
   const { messages, sendMessage, status, setMessages } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
@@ -219,6 +221,7 @@ export default function BotchatDashboard() {
     savedMessageIdsRef.current = new Set(uiMessages.map((m) => m.id));
     setMessages(uiMessages);
     setInput("");
+    setPendingFiles([]);
   };
 
   const handleDeleteSession = async (session: SessionRow) => {
@@ -267,6 +270,7 @@ export default function BotchatDashboard() {
       savedMessageIdsRef.current = new Set();
       setMessages([]);
       setInput("");
+      setPendingFiles([]);
       return;
     }
 
@@ -290,6 +294,7 @@ export default function BotchatDashboard() {
     savedMessageIdsRef.current = new Set();
     setMessages([]);
     setInput("");
+    setPendingFiles([]);
   };
 
   useEffect(() => {
@@ -459,22 +464,56 @@ export default function BotchatDashboard() {
     };
   }, [activeSessionId, messages]);
 
+  const uploadAttachments = async (sessionId: string, files: File[]) => {
+    const formData = new FormData();
+    formData.set("sessionId", sessionId);
+    files.forEach((file) => formData.append("files", file, file.name));
+
+    const response = await fetch("/api/attachments/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const payload = (await response.json()) as { files?: FileUIPart[] };
+    if (!Array.isArray(payload.files)) {
+      throw new Error("Invalid upload response.");
+    }
+
+    return payload.files;
+  };
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = input.trim();
-    if (!trimmed || status !== "ready") return;
+    const hasText = trimmed.length > 0;
+    const hasFiles = pendingFiles.length > 0;
+    if ((!hasText && !hasFiles) || status !== "ready") return;
     if (!activeSessionId || !activeExpertId) return;
 
     setSessions((prev) => {
       const now = new Date().toISOString();
+      const attachmentSummary = hasFiles
+        ? pendingFiles.length === 1
+          ? `Attachment: ${pendingFiles[0]?.name ?? "file"}`
+          : `Attachments: ${pendingFiles[0]?.name ?? "file"} +${
+              pendingFiles.length - 1
+            }`
+        : null;
+      const previewText = hasText ? trimmed : attachmentSummary ?? "";
       return prev
         .map((s) =>
           s.id === activeSessionId
             ? {
                 ...s,
                 title:
-                  s.title === "New chat" ? trimmed.slice(0, 60) : s.title,
-                last_message: trimmed.slice(0, 500),
+                  s.title === "New chat"
+                    ? previewText.slice(0, 60) || s.title
+                    : s.title,
+                last_message: previewText.slice(0, 500),
                 updated_at: now,
               }
             : s
@@ -485,11 +524,34 @@ export default function BotchatDashboard() {
         );
     });
 
-    sendMessage(
-      { text: trimmed },
-      { body: { sessionId: activeSessionId, expertId: activeExpertId } }
-    );
-    setInput("");
+    void (async () => {
+      try {
+        setIsUploadingAttachments(hasFiles);
+
+        const uploadedFiles = hasFiles
+          ? await uploadAttachments(activeSessionId, pendingFiles)
+          : undefined;
+
+        if (hasText) {
+          await sendMessage(
+            { text: trimmed, files: uploadedFiles },
+            { body: { sessionId: activeSessionId, expertId: activeExpertId } }
+          );
+        } else if (uploadedFiles) {
+          await sendMessage(
+            { files: uploadedFiles },
+            { body: { sessionId: activeSessionId, expertId: activeExpertId } }
+          );
+        }
+
+        setInput("");
+        setPendingFiles([]);
+      } catch (error) {
+        console.error("Failed to send message with attachments", error);
+      } finally {
+        setIsUploadingAttachments(false);
+      }
+    })();
   };
   return (
     <SidebarProvider
@@ -526,8 +588,10 @@ export default function BotchatDashboard() {
         setInput={setInput}
         onSubmit={onSubmit}
         onCreateSessionForExpert={handleCreateSessionForExpert}
+        pendingFiles={pendingFiles}
+        setPendingFiles={setPendingFiles}
+        isUploadingAttachments={isUploadingAttachments}
       />
     </SidebarProvider>
   );
 }
-

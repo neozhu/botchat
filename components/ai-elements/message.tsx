@@ -311,6 +311,9 @@ export const MessageResponse = memo(
     <Streamdown
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        "[&_[data-streamdown=code-block]]:bg-background [&_[data-streamdown=code-block]]:text-foreground",
+        "[&_[data-streamdown=code-block-header]]:bg-muted [&_[data-streamdown=code-block-header]]:border-b [&_[data-streamdown=code-block-header]]:border-border",
+        "[&_[data-streamdown=code-block-body]]:!bg-transparent [&_[data-streamdown=code-block-body]]:!text-foreground",
         className
       )}
       {...props}

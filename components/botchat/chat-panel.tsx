@@ -162,7 +162,7 @@ const MessageBubble = memo(function MessageBubble({
               className={cn(
                 "text-sm leading-relaxed",
                 "[&_a]:underline [&_a]:underline-offset-4",
-                "[&_code]:rounded-md [&_code]:px-1.5 [&_code]:py-0.5",
+                "[&_:not(pre)>code]:rounded-md [&_:not(pre)>code]:px-1.5 [&_:not(pre)>code]:py-0.5",
                 "[&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:p-4",
                 "[&_img]:max-w-full [&_img]:rounded-2xl [&_img]:border",
                 "[&_ul]:space-y-0 [&_ul]:pl-0 [&_ul]:list-none",
@@ -175,8 +175,8 @@ const MessageBubble = memo(function MessageBubble({
                 "[&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-2",
                 "[&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2",
                 isUser
-                  ? "[&_code]:bg-black/5 [&_pre]:bg-black/90 [&_img]:border-black/10 [&_ul>li:before]:text-black/60"
-                  : "[&_code]:bg-white/15 [&_pre]:bg-white/10 [&_img]:border-white/15 [&_ul>li:before]:text-white/70"
+                  ? "[&_:not(pre)>code]:bg-black/5 [&_img]:border-black/10 [&_ul>li:before]:text-black/60"
+                  : "[&_:not(pre)>code]:bg-white/15 [&_img]:border-white/15 [&_ul>li:before]:text-white/70"
               )}
             >
               {text}

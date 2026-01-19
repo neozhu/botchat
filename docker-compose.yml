@@ -1,0 +1,8 @@
+services:
+  botchat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3202:3000"
+    restart: unless-stopped

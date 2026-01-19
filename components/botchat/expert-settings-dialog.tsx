@@ -21,6 +21,7 @@ import {
   Check,
   ChevronRight,
   Copy,
+  GripVertical,
   Loader2,
   Plus,
   Sparkles,
@@ -55,6 +56,19 @@ const expertGenerationSchema = z.object({
   system_prompt: z.string().min(1),
   suggestion_question: z.string().min(1),
 });
+
+function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex) return items;
+  const next = items.slice();
+  const [moved] = next.splice(fromIndex, 1);
+  if (!moved) return items;
+  next.splice(toIndex, 0, moved);
+  return next;
+}
+
+function normalizeExpertOrder(rows: ExpertRow[]) {
+  return rows.map((row, index) => ({ ...row, sort_order: index }));
+}
 
 function slugify(value: string) {
   return value
@@ -95,12 +109,18 @@ export function ExpertSettingsDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ExpertDraft>(() => defaultDraft());
   const [copied, setCopied] = useState<null | "system_prompt" | "suggestion_question">(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const wasDirtyRef = useRef(false);
+  const lastSyncedSelectedIdRef = useRef<string | null>(null);
+  const expertsRef = useRef<ExpertRow[]>([]);
+  const draggingIdRef = useRef<string | null>(null);
+  const dragStartOrderRef = useRef<string[] | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -151,6 +171,10 @@ export function ExpertSettingsDialog({
     wasDirtyRef.current = isDirty;
   }, [isDirty]);
 
+  useEffect(() => {
+    expertsRef.current = experts;
+  }, [experts]);
+
   const loadExperts = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -175,6 +199,33 @@ export function ExpertSettingsDialog({
     setIsLoading(false);
   }, [onExpertsUpdated, supabase]);
 
+  const persistExpertOrder = useCallback(
+    async (nextExperts: ExpertRow[]) => {
+      setIsReordering(true);
+      setError(null);
+
+      const results = await Promise.all(
+        nextExperts.map((expert) =>
+          supabase
+            .from("experts")
+            .update({ sort_order: expert.sort_order })
+            .eq("id", expert.id)
+        )
+      );
+
+      const firstError = results.find((result) => result.error)?.error ?? null;
+      if (firstError) {
+        setError(firstError.message);
+        setIsReordering(false);
+        return;
+      }
+
+      onExpertsUpdated?.(nextExperts);
+      setIsReordering(false);
+    },
+    [onExpertsUpdated, supabase]
+  );
+
   useEffect(() => {
     if (!open) return;
     void loadExperts();
@@ -183,6 +234,9 @@ export function ExpertSettingsDialog({
   useEffect(() => {
     if (!open) return;
     if (!selected) return;
+    const sameSelection = lastSyncedSelectedIdRef.current === selected.id;
+    if (sameSelection && wasDirtyRef.current) return;
+    lastSyncedSelectedIdRef.current = selected.id;
     setDraft({
       id: selected.id,
       slug: selected.slug,
@@ -220,21 +274,35 @@ export function ExpertSettingsDialog({
     setError(null);
 
     try {
+      const computedSlug = (draft.slug.trim() || slugify(draft.name)).slice(0, 48);
+      const nextSortOrder = (() => {
+        if (draft.id) {
+          return Number.isFinite(draft.sort_order) ? draft.sort_order : 0;
+        }
+        const maxExisting = experts.reduce((acc, expert) => {
+          const value = Number.isFinite(expert.sort_order) ? expert.sort_order : 0;
+          return Math.max(acc, value);
+        }, -1);
+        return maxExisting + 1;
+      })();
+
       const payload = {
-        slug: draft.slug.trim(),
+        slug: computedSlug,
         name: draft.name.trim(),
         agent_name: draft.agent_name.trim(),
         description: draft.description.trim() || null,
         system_prompt: draft.system_prompt.trim(),
         suggestion_question: draft.suggestion_question.trim() || null,
-        sort_order: Number.isFinite(draft.sort_order) ? draft.sort_order : 0,
+        sort_order: nextSortOrder,
       };
 
-      if (!payload.slug || !payload.name || !payload.agent_name || !payload.system_prompt) {
-        setError("Slug / Name / Agent name / System prompt are required.");
+      if (!payload.name || !payload.agent_name || !payload.system_prompt) {
+        setError("Name / Agent name / System prompt are required.");
         setIsSaving(false);
         return;
       }
+
+      setDraft((prev) => ({ ...prev, slug: payload.slug, sort_order: payload.sort_order }));
 
       if (draft.id) {
         const { error: updateError } = await supabase
@@ -291,8 +359,18 @@ export function ExpertSettingsDialog({
     setIsDeleting(true);
     setError(null);
     try {
-      const { error: deleteError } = await supabase.from("experts").delete().eq("id", selected.id);
-      if (deleteError) throw deleteError;
+      const response = await fetch("/api/experts/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: selected.id }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(body?.error || (await response.text()));
+      }
       setSelectedId(null);
       setDraft(defaultDraft());
       await loadExperts();
@@ -358,6 +436,13 @@ export function ExpertSettingsDialog({
   };
 
   const headerLabel = selected ? "Edit expert" : "New expert";
+  const canReorder =
+    query.trim() === "" &&
+    !isLoading &&
+    !isSaving &&
+    !isDeleting &&
+    !isGenerating &&
+    !isReordering;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -388,25 +473,31 @@ export function ExpertSettingsDialog({
               </Button>
             </div>
 
-            <div className="mt-4 flex items-center gap-2">
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search experts…"
-                className="bg-white"
-              />
-              <Badge variant="secondary" className="shrink-0 rounded-full text-[10px]">
-                {experts.length}
-              </Badge>
-            </div>
+             <div className="mt-4 flex items-center gap-2">
+               <Input
+                 value={query}
+                 onChange={(e) => setQuery(e.target.value)}
+                 placeholder="Search experts…"
+                 className="bg-white"
+               />
+               <Badge variant="secondary" className="shrink-0 rounded-full text-[10px]">
+                 {experts.length}
+               </Badge>
+               {isReordering ? (
+                 <Loader2
+                   className="h-4 w-4 animate-spin text-muted-foreground"
+                   aria-label="Saving order"
+                 />
+               ) : null}
+             </div>
 
             <Separator className="my-4 bg-black/10" />
 
-            <ScrollArea className="h-[52vh] pr-2 md:h-[64vh]">
-              <div className="space-y-2">
-                {isLoading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <div
+             <ScrollArea className="h-[52vh] pr-2 md:h-[64vh]">
+               <div className="space-y-2">
+                 {isLoading ? (
+                   Array.from({ length: 3 }).map((_, i) => (
+                     <div
                       key={`expert-skeleton-${i}`}
                       className="h-12 rounded-xl border border-black/10 bg-white/60"
                     />
@@ -418,30 +509,130 @@ export function ExpertSettingsDialog({
                 ) : (
                   filtered.map((expert) => {
                     const isActive = expert.id === selectedId;
+                    const isDragging = draggingId === expert.id;
+
                     return (
-                      <button
+                      <div
                         key={expert.id}
-                        type="button"
-                        onClick={() => selectExpert(expert.id)}
+                        data-expert-row
+                        data-expert-id={expert.id}
                         className={cn(
-                          "group w-full rounded-2xl border px-3 py-2 text-left transition",
+                          "group flex w-full items-stretch gap-1 rounded-2xl border p-1 transition",
                           isActive
                             ? "border-[var(--accent-line)]/30 bg-white shadow-[0_16px_40px_-28px_rgba(32,24,70,0.55)]"
-                            : "border-black/10 bg-white/60 hover:bg-white"
+                            : "border-black/10 bg-white/60 hover:bg-white",
+                          isDragging && "opacity-70"
                         )}
                       >
-                        <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={
+                            canReorder
+                              ? "Drag to reorder"
+                              : query.trim()
+                                ? "Clear search to reorder"
+                                : "Reordering disabled"
+                          }
+                          title={
+                            canReorder
+                              ? "Drag to reorder"
+                              : query.trim()
+                                ? "Clear search to reorder"
+                                : "Reordering disabled"
+                          }
+                          disabled={!canReorder}
+                          onPointerDown={(event) => {
+                            if (!canReorder) return;
+                            draggingIdRef.current = expert.id;
+                            dragStartOrderRef.current = expertsRef.current.map((e) => e.id);
+                            setDraggingId(expert.id);
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onPointerMove={(event) => {
+                            const draggingId = draggingIdRef.current;
+                            if (!canReorder || !draggingId) return;
+
+                            const element = document.elementFromPoint(
+                              event.clientX,
+                              event.clientY
+                            );
+                            const row = element?.closest?.(
+                              "[data-expert-row]"
+                            ) as HTMLElement | null;
+                            const overId = row?.dataset?.expertId ?? null;
+                            if (!overId || overId === draggingId) return;
+
+                            setExperts((prev) => {
+                              const fromIndex = prev.findIndex((e) => e.id === draggingId);
+                              const toIndex = prev.findIndex((e) => e.id === overId);
+                              if (fromIndex < 0 || toIndex < 0) return prev;
+                              return normalizeExpertOrder(moveArrayItem(prev, fromIndex, toIndex));
+                            });
+                          }}
+                          onPointerUp={(event) => {
+                            const startOrder = dragStartOrderRef.current;
+                            const draggingId = draggingIdRef.current;
+                            dragStartOrderRef.current = null;
+                            draggingIdRef.current = null;
+                            setDraggingId(null);
+
+                            if (!draggingId) return;
+                            try {
+                              event.currentTarget.releasePointerCapture(event.pointerId);
+                            } catch {
+                              // Ignore.
+                            }
+
+                            if (!startOrder) return;
+
+                            const currentExperts = expertsRef.current;
+                            const nextOrder = currentExperts.map((e) => e.id);
+                            const hasChanged =
+                              startOrder.length === nextOrder.length &&
+                              startOrder.some((id, index) => id !== nextOrder[index]);
+                            if (!hasChanged) return;
+
+                            const normalized = normalizeExpertOrder(currentExperts);
+                            setExperts(normalized);
+                            if (draft.id && selectedId === draft.id) {
+                              const nextSelected = normalized.find((e) => e.id === draft.id) ?? null;
+                              if (nextSelected) {
+                                setDraft((prev) => ({ ...prev, sort_order: nextSelected.sort_order }));
+                              }
+                            }
+                            void persistExpertOrder(normalized);
+                          }}
+                          onPointerCancel={() => {
+                            dragStartOrderRef.current = null;
+                            draggingIdRef.current = null;
+                            setDraggingId(null);
+                          }}
+                          className={cn(
+                            "grid h-10 w-9 place-items-center rounded-xl border border-transparent text-muted-foreground transition",
+                            canReorder
+                              ? "cursor-grab hover:bg-black/5 hover:text-foreground active:cursor-grabbing"
+                              : "cursor-not-allowed opacity-40"
+                          )}
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => selectExpert(expert.id)}
+                          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl py-1 text-left"
+                        >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-semibold">
-                              {expert.name}
-                            </p>
+                            <p className="truncate text-xs font-semibold">{expert.name}</p>
                             <p className="truncate text-[11px] text-muted-foreground">
-                              {expert.agent_name} · {expert.slug}
+                              {expert.agent_name} · {expert.slug ?? ""}
                             </p>
                           </div>
                           <ChevronRight className="h-4 w-4 opacity-60 transition group-hover:opacity-90" />
-                        </div>
-                      </button>
+                        </button>
+                      </div>
                     );
                   })
                 )}
@@ -509,10 +700,8 @@ export function ExpertSettingsDialog({
                         setDraft((prev) => {
                           const next = { ...prev, name: nextName };
                           const nextSlug = slugify(nextName);
-                          const shouldAutofill =
-                            prev.slug.trim() === "" ||
-                            prev.slug.trim() === slugify(prev.name);
-                          return shouldAutofill ? { ...next, slug: nextSlug } : next;
+                          if (!prev.id) return { ...next, slug: nextSlug };
+                          return next;
                         });
                       }}
                       placeholder="e.g. Travel Concierge"
@@ -525,29 +714,6 @@ export function ExpertSettingsDialog({
                       value={draft.agent_name}
                       onChange={(e) => setDraft((prev) => ({ ...prev, agent_name: e.target.value }))}
                       placeholder="e.g. Kate"
-                      className="bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-medium text-muted-foreground">Slug</p>
-                    <Input
-                      value={draft.slug}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, slug: e.target.value }))}
-                      placeholder="travel-concierge"
-                      className="bg-white font-mono text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-medium text-muted-foreground">Sort order</p>
-                    <Input
-                      type="number"
-                      value={draft.sort_order}
-                      onChange={(e) =>
-                        setDraft((prev) => ({ ...prev, sort_order: Number(e.target.value) }))
-                      }
                       className="bg-white"
                     />
                   </div>

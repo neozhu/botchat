@@ -3,6 +3,7 @@
 import type { UIMessage } from "ai";
 import type { FormEvent } from "react";
 import { memo } from "react";
+import Image from "next/image";
 import {
   Conversation,
   ConversationContent,
@@ -176,15 +177,20 @@ const MessageBubble = memo(function MessageBubble({
             const isImage = part.mediaType?.startsWith("image/");
             if (isImage) {
               return (
-                <img
+                <Image
                   key={part.url}
                   src={part.url}
                   alt={part.filename ?? "image"}
-                  loading="lazy"
+                  width={1200}
+                  height={800}
+                  sizes="(max-width: 768px) 100vw, 72vw"
+                  loader={({ src }) => src}
+                  unoptimized
                   className={cn(
                     "max-w-full rounded-2xl border",
                     isUser ? "border-black/10" : "border-white/15"
                   )}
+                  style={{ height: "auto" }}
                 />
               );
             }
@@ -419,4 +425,3 @@ export function ChatPanel({
     </SidebarInset>
   );
 }
-

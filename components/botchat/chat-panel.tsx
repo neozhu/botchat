@@ -477,7 +477,7 @@ export function ChatPanel({
                   Preset: {activeExpert.name}
                 </p>
               ) : null}
-              <h1 className="truncate font-[var(--font-display)] text-[1.7rem] leading-none font-semibold tracking-tight">
+              <h1 className="truncate font-[var(--font-display)] text-[1.6rem] leading-none font-semibold tracking-tight">
                 {botName}
               </h1>
             </div>

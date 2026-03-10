@@ -262,6 +262,16 @@ export function ChatPanel({
   }, [previews]);
 
   const canSend = status === "ready" && !isUploadingAttachments;
+  const showPromptSuggestion = messages.length === 0;
+  const lastMessage = messages[messages.length - 1];
+  const lastMessageHasText = lastMessage
+    ? messageText(lastMessage).trim().length > 0
+    : false;
+  const shouldShowThinking =
+    status !== "ready" &&
+    (!!lastMessage &&
+      (lastMessage.role === "user" ||
+        (lastMessage.role === "assistant" && !lastMessageHasText)));
 
   const totalBytes = useMemo(
     () => pendingFiles.reduce((sum, file) => sum + file.size, 0),
@@ -342,28 +352,35 @@ export function ChatPanel({
           </div>
 
           <div className="relative flex-1 overflow-hidden">
-            <div className="absolute left-10 top-6 z-10 flex items-start gap-4">
-              <span className="relative text-[10px] font-semibold uppercase tracking-[0.25em] text-[var(--accent-line)]">
-                AI prompt suggestion
-                <span className="absolute left-1/2 top-full h-8 w-px -translate-x-1/2 bg-[var(--accent-line-soft)]" />
-              </span>
-              <div className="relative rounded-2xl border border-[var(--accent-line-soft)] bg-white/90 px-4 py-3 text-xs shadow-[0_14px_30px_-18px_rgba(126,92,186,0.45)]">
-                <p className="max-w-[260px] leading-relaxed text-foreground/80">
-                  {suggestionText}
-                </p>
-                <Button
-                  size="sm"
-                  className="mt-3 h-8 rounded-full bg-[var(--accent-line)] text-white shadow-none hover:bg-[var(--accent-line)]/90"
-                  onClick={() => setInput(suggestionText)}
-                >
-                  Use
-                </Button>
-                <span className="absolute -left-6 top-4 h-px w-6 bg-[var(--accent-line-soft)]" />
+            {showPromptSuggestion ? (
+              <div className="absolute left-10 top-6 z-10 flex items-start gap-4">
+                <span className="relative text-[10px] font-semibold uppercase tracking-[0.25em] text-[var(--accent-line)]">
+                  AI prompt suggestion
+                  <span className="absolute left-1/2 top-full h-8 w-px -translate-x-1/2 bg-[var(--accent-line-soft)]" />
+                </span>
+                <div className="relative rounded-2xl border border-[var(--accent-line-soft)] bg-white/90 px-4 py-3 text-xs shadow-[0_14px_30px_-18px_rgba(126,92,186,0.45)]">
+                  <p className="max-w-[260px] leading-relaxed text-foreground/80">
+                    {suggestionText}
+                  </p>
+                  <Button
+                    size="sm"
+                    className="mt-3 h-8 rounded-full bg-[var(--accent-line)] text-white shadow-none hover:bg-[var(--accent-line)]/90"
+                    onClick={() => setInput(suggestionText)}
+                  >
+                    Use
+                  </Button>
+                  <span className="absolute -left-6 top-4 h-px w-6 bg-[var(--accent-line-soft)]" />
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <Conversation className="h-full">
-              <ConversationContent className="gap-6 px-8 pt-28 pb-32">
+              <ConversationContent
+                className={cn(
+                  "gap-6 px-8 pb-32",
+                  showPromptSuggestion ? "pt-28" : "pt-8"
+                )}
+              >
                 {messages.length === 0 ? (
                   <ConversationEmptyState
                     title="Start a new chat"
@@ -371,16 +388,26 @@ export function ChatPanel({
                   />
                 ) : null}
 
-                {messages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    botInitials={botInitials}
-                  />
-                ))}
+                {messages.map((message, index) => {
+                  const isLastMessage = index === messages.length - 1;
+                  const isStreamingAssistantPlaceholder =
+                    status !== "ready" &&
+                    isLastMessage &&
+                    message.role === "assistant" &&
+                    messageText(message).trim().length === 0;
 
-                {status !== "ready" &&
-                messages[messages.length - 1]?.role === "user" ? (
+                  if (isStreamingAssistantPlaceholder) return null;
+
+                  return (
+                    <MessageBubble
+                      key={message.id}
+                      message={message}
+                      botInitials={botInitials}
+                    />
+                  );
+                })}
+
+                {shouldShowThinking ? (
                   <MessageBubble
                     message={{
                       id: "streaming",

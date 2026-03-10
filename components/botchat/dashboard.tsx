@@ -7,90 +7,13 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { ChatPanel } from "@/components/botchat/chat-panel";
 import { SessionsPanel } from "@/components/botchat/sessions-panel";
+import type {
+  BotchatBootstrapData,
+  ExpertRow,
+  SessionRow,
+} from "@/lib/botchat/types";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-
-
-type ExpertRow = {
-  id: string;
-  slug: string;
-  name: string;
-  agent_name: string;
-  description: string | null;
-  system_prompt: string;
-  suggestion_question: string | null;
-  sort_order: number;
-  created_at: string;
-};
-
-type SessionRow = {
-  id: string;
-  expert_id: string;
-  title: string;
-  last_message: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-const expertSeeds = [
-  {
-    slug: "travel-concierge",
-    name: "Travel Concierge",
-    agent_name: "Kate",
-    description: "Curated travel planning and premium trip advice.",
-    system_prompt:
-      "You are a travel concierge. Deliver premium trip guidance, thoughtful itineraries, and upscale service tone.",
-    suggestion_question:
-      "Can you help me plan a trip — what suitcase sizes should I choose for my destination and trip length?",
-    sort_order: 0,
-  },
-  {
-    slug: "product-specialist",
-    name: "Product Specialist",
-    agent_name: "Noah",
-    description: "Deep product knowledge and feature comparisons.",
-    system_prompt:
-      "You are a product specialist. Be precise, technical when needed, and compare options clearly.",
-    suggestion_question:
-      "Can you compare durable vs lightweight luggage — what are the tradeoffs and your recommendation?",
-    sort_order: 1,
-  },
-  {
-    slug: "brand-voice",
-    name: "Brand Voice",
-    agent_name: "Iris",
-    description: "Refined tone, storytelling, and brand consistency.",
-    system_prompt:
-      "You are the brand voice. Keep responses refined, poetic but practical, and aligned with luxury positioning.",
-    suggestion_question:
-      "Can you rewrite my message in a refined premium tone? Here’s my draft: ",
-    sort_order: 2,
-  },
-  {
-    slug: "support-agent",
-    name: "Support Agent",
-    agent_name: "Alex",
-    description: "Calm troubleshooting and resolution-focused help.",
-    system_prompt:
-      "You are a support agent. Be calm, empathetic, and focused on resolution steps.",
-    suggestion_question:
-      "Can you troubleshoot this step-by-step? My suitcase (handle/wheels/lock) is not working properly.",
-    sort_order: 3,
-  },
-  {
-    slug: "friendly-translator",
-    name: "Friendly Translator",
-    agent_name: "Luna",
-    description:
-      "Daily conversation translator: EN/DE → 中文, 中文 → English, with natural and polite phrasing.",
-    system_prompt:
-      "You are a translation agent for everyday conversation. Output only the translated text and do not answer questions or add explanations. If the user input is Chinese, translate it into natural, friendly English. If the user input is English or German, translate it into natural, polite Chinese. Prefer common expressions, keep the tone warm and courteous, avoid overly formal style, and avoid rare words.",
-    suggestion_question:
-      "请帮我翻译这句话：Could you let me know when you arrive?",
-    sort_order: 4,
-  },
-];
 
 function messageText(message: UIMessage) {
   const parts = (message as UIMessage).parts ?? [];
@@ -108,10 +31,6 @@ function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   const letters = parts.slice(0, 2).map((part) => part[0]);
   return letters.join("").toUpperCase() || "AI";
-}
-
-function coerceParts(value: unknown) {
-  return Array.isArray(value) ? (value as UIMessage["parts"]) : [];
 }
 
 function formatRelativeTime(thenIso: string, nowMs: number) {
@@ -144,16 +63,23 @@ function formatRelativeTime(thenIso: string, nowMs: number) {
   }).format(new Date(thenMs));
 }
 
-export default function BotchatDashboard() {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
-  const savedMessageIdsRef = useRef<Set<string>>(new Set());
-  const messagesSessionIdRef = useRef<string | null>(null);
+type BotchatDashboardProps = {
+  initialData: BotchatBootstrapData;
+};
+
+export default function BotchatDashboard({
+  initialData,
+}: BotchatDashboardProps) {
+  const initialSessionIdRef = useRef(initialData.activeSessionId);
+  const initialMessagesRef = useRef(initialData.messages);
+  const savedMessageIdsRef = useRef<Set<string>>(
+    new Set(initialData.messages.map((message) => message.id))
+  );
+  const messagesSessionIdRef = useRef<string | null>(initialData.activeSessionId);
   const generationSessionIdRef = useRef<string | null>(null);
   const inFlightAbortRef = useRef<AbortController | null>(null);
   const sessionLoadTokenRef = useRef(0);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [isLoadingExperts, setIsLoadingExperts] = useState(true);
-  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [deletingSessionIds, setDeletingSessionIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -162,14 +88,26 @@ export default function BotchatDashboard() {
   );
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [messageTimestamps, setMessageTimestamps] = useState<
+    Record<string, string>
+  >(() => initialData.messageTimestamps);
 
-  const [experts, setExperts] = useState<ExpertRow[]>([]);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [activeExpertId, setActiveExpertId] = useState<string | null>(null);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [experts, setExperts] = useState<ExpertRow[]>(() => initialData.experts);
+  const [sessions, setSessions] = useState<SessionRow[]>(() => initialData.sessions);
+  const [activeExpertId, setActiveExpertId] = useState<string | null>(
+    () => initialData.activeExpertId
+  );
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(
+    () => initialData.activeSessionId
+  );
+  const chatBootstrapMessages =
+    activeSessionId && activeSessionId === initialSessionIdRef.current
+      ? initialMessagesRef.current
+      : [];
 
   const { messages, sendMessage, status, setMessages, stop } = useChat({
     id: activeSessionId ?? "new",
+    messages: chatBootstrapMessages,
     transport: new DefaultChatTransport({ api: "/api/chat" }),
     onFinish: ({ message }) => {
       const targetSessionId =
@@ -207,16 +145,13 @@ export default function BotchatDashboard() {
     [experts, activeExpertId]
   );
 
-  const activeSession = useMemo(
-    () => sessions.find((session) => session.id === activeSessionId) ?? null,
-    [sessions, activeSessionId]
-  );
-
   const botName = activeExpert?.agent_name ?? "Kate";
   const botInitials = initialsFromName(botName);
   const suggestionText =
     activeExpert?.suggestion_question ?? "What should the assistant ask next?";
   const providerOpen = isMobile ? false : sidebarOpen;
+  const isLoadingExperts = false;
+  const isLoadingSessions = false;
 
   const handleSelectSession = async (session: SessionRow) => {
     const token = ++sessionLoadTokenRef.current;
@@ -235,31 +170,38 @@ export default function BotchatDashboard() {
     messagesSessionIdRef.current = null;
     savedMessageIdsRef.current = new Set();
     setMessages([]);
+    setMessageTimestamps({});
     setPendingFiles([]);
     setInput("");
 
     setActiveSessionId(session.id);
     setActiveExpertId(session.expert_id);
 
-    const { data: messageRows } = await supabase
-      .from("chat_messages")
-      .select("ui_message_id, role, parts, created_at")
-      .eq("session_id", session.id)
-      .order("created_at", { ascending: true });
+    const response = await fetch(
+      `/api/sessions/messages?sessionId=${encodeURIComponent(session.id)}`
+    );
+    if (!response.ok) {
+      console.error("Failed to load session messages", await response.text());
+      return;
+    }
 
-    const uiMessages = (messageRows ?? []).map((row: unknown) => {
-      const record = row as Record<string, unknown>;
-      return {
-        id: String(record.ui_message_id),
-        role: record.role as UIMessage["role"],
-        parts: coerceParts(record.parts),
-      };
-    }) as UIMessage[];
+    const payload = (await response.json()) as {
+      messages?: UIMessage[];
+      messageTimestamps?: Record<string, string>;
+    };
+    const uiMessages = Array.isArray(payload.messages) ? payload.messages : [];
+    const loadedTimestamps =
+      payload.messageTimestamps &&
+      typeof payload.messageTimestamps === "object" &&
+      !Array.isArray(payload.messageTimestamps)
+        ? payload.messageTimestamps
+        : {};
 
     if (token !== sessionLoadTokenRef.current) return;
 
     messagesSessionIdRef.current = session.id;
     savedMessageIdsRef.current = new Set(uiMessages.map((m) => m.id));
+    setMessageTimestamps(loadedTimestamps);
     setMessages(uiMessages);
   };
 
@@ -318,6 +260,7 @@ export default function BotchatDashboard() {
       messagesSessionIdRef.current = null;
       savedMessageIdsRef.current = new Set();
       setMessages([]);
+      setMessageTimestamps({});
       setInput("");
       setPendingFiles([]);
       return;
@@ -338,20 +281,27 @@ export default function BotchatDashboard() {
 
     setActiveExpertId(expertId);
 
-    const { data: newSession } = await supabase
-      .from("chat_sessions")
-      .insert({ expert_id: expertId, title: "New chat" })
-      .select("id, expert_id, title, last_message, created_at, updated_at")
-      .single();
+    const response = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ expertId }),
+    });
 
-    if (!newSession) return;
+    if (!response.ok) {
+      console.error("Failed to create session", await response.text());
+      return;
+    }
 
-    const session = newSession as unknown as SessionRow;
+    const payload = (await response.json()) as { session?: SessionRow };
+    const session = payload.session ?? null;
+    if (!session) return;
+
     setSessions((prev) => [session, ...prev]);
     setActiveSessionId(session.id);
     messagesSessionIdRef.current = session.id;
     savedMessageIdsRef.current = new Set();
     setMessages([]);
+    setMessageTimestamps({});
     setInput("");
     setPendingFiles([]);
   };
@@ -362,115 +312,69 @@ export default function BotchatDashboard() {
   }, []);
 
   useEffect(() => {
+    if (sessions.length > 0 || experts.length === 0 || activeSessionId) return;
+
     let cancelled = false;
 
-    const loadAll = async () => {
+    const createInitialSession = async () => {
       try {
-        const { data: existingExperts } = await supabase
-          .from("experts")
-          .select(
-            "id, slug, name, agent_name, description, system_prompt, suggestion_question, sort_order, created_at"
-          )
-          .order("sort_order", { ascending: true })
-          .order("created_at", { ascending: true });
+        const expertId = activeExpertId ?? experts[0]?.id ?? null;
+        if (!expertId) return;
 
-        if (cancelled) return;
+        const response = await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ expertId }),
+        });
 
-        const existingSlugs = new Set((existingExperts ?? []).map((expert) => expert.slug));
-        const missingSeeds = expertSeeds.filter((seed) => !existingSlugs.has(seed.slug));
-
-        if (missingSeeds.length > 0) {
-          await supabase.from("experts").upsert(missingSeeds, {
-            onConflict: "slug",
-          });
-        }
-
-        const { data: expertsAfterSeed } = await supabase
-          .from("experts")
-          .select(
-            "id, slug, name, agent_name, description, system_prompt, suggestion_question, sort_order, created_at"
-          )
-          .order("sort_order", { ascending: true })
-          .order("created_at", { ascending: true });
-
-        if (cancelled) return;
-
-        const loadedExperts = (expertsAfterSeed ?? []) as ExpertRow[];
-        setExperts(loadedExperts);
-        setIsLoadingExperts(false);
-
-        const { data: loadedSessions } = await supabase
-          .from("chat_sessions")
-          .select("id, expert_id, title, last_message, created_at, updated_at")
-          .order("updated_at", { ascending: false })
-          .limit(50);
-
-        if (cancelled) return;
-
-        const loaded = (loadedSessions ?? []) as SessionRow[];
-        setSessions(loaded);
-        setIsLoadingSessions(false);
-
-        if (loaded.length > 0) {
-          const current = loaded[0];
-          setActiveSessionId(current.id);
-          setActiveExpertId(current.expert_id);
-
-          const { data: messageRows } = await supabase
-            .from("chat_messages")
-            .select("ui_message_id, role, parts, created_at")
-            .eq("session_id", current.id)
-            .order("created_at", { ascending: true });
-
-          if (cancelled) return;
-
-          const uiMessages = (messageRows ?? []).map((row: unknown) => {
-            const record = row as Record<string, unknown>;
-            return {
-              id: String(record.ui_message_id),
-              role: record.role as UIMessage["role"],
-              parts: coerceParts(record.parts),
-            };
-          }) as UIMessage[];
-
-          messagesSessionIdRef.current = current.id;
-          savedMessageIdsRef.current = new Set(uiMessages.map((m) => m.id));
-          setMessages(uiMessages);
-        } else if (loadedExperts.length > 0) {
-          const expertId = loadedExperts[0].id;
-          const { data: newSession } = await supabase
-            .from("chat_sessions")
-            .insert({ expert_id: expertId, title: "New chat" })
-            .select(
-              "id, expert_id, title, last_message, created_at, updated_at"
-            )
-            .single();
-
-          if (cancelled) return;
-
-          if (newSession) {
-            const session = newSession as unknown as SessionRow;
-            setSessions([session]);
-            setActiveSessionId(session.id);
-            setActiveExpertId(session.expert_id);
-            messagesSessionIdRef.current = session.id;
-            savedMessageIdsRef.current = new Set();
-            setMessages([]);
+        if (cancelled || !response.ok) {
+          if (!cancelled && !response.ok) {
+            console.error("Failed to create initial session", await response.text());
           }
+          return;
         }
+
+        const payload = (await response.json()) as { session?: SessionRow };
+        const session = payload.session ?? null;
+        if (!session) return;
+
+        setSessions([session]);
+        setActiveSessionId(session.id);
+        setActiveExpertId(session.expert_id);
+        messagesSessionIdRef.current = session.id;
+        savedMessageIdsRef.current = new Set();
+        setMessages([]);
+        setMessageTimestamps({});
       } catch (error) {
         if (cancelled) return;
-        setIsLoadingExperts(false);
-        setIsLoadingSessions(false);
-        console.error("Failed to load Supabase data", error);
+        console.error("Failed to create initial session", error);
       }
     };
 
-    void loadAll();
+    void createInitialSession();
     return () => {
       cancelled = true;
     };
-  }, [setMessages, supabase]);
+  }, [activeExpertId, activeSessionId, experts, sessions.length, setMessages]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    setMessageTimestamps((prev) => {
+      let changed = false;
+      const now = new Date().toISOString();
+      const next = { ...prev };
+
+      for (const message of messages) {
+        if (!next[message.id]) {
+          next[message.id] = now;
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [messages]);
 
   useEffect(() => {
     const sessionId = messagesSessionIdRef.current;
@@ -668,10 +572,10 @@ export default function BotchatDashboard() {
         suggestionText={suggestionText}
         activeExpert={activeExpert}
         activeExpertId={activeExpertId}
-        activeSession={activeSession}
         experts={experts}
         isLoadingExperts={isLoadingExperts}
         messages={messages}
+        messageTimestamps={messageTimestamps}
         status={status}
         input={input}
         setInput={setInput}

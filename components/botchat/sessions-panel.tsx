@@ -79,8 +79,8 @@ export function SessionsPanel({
       className="border border-white/60 bg-[var(--panel-soft)]/90 shadow-[0_20px_60px_-40px_rgba(30,20,60,0.45)] backdrop-blur"
       mobileBehavior="icon"
     >
-      <SidebarHeader className="gap-4 pb-3 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pb-0">
-        <div className="flex items-center justify-between px-3 pt-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+      <SidebarHeader className="gap-3 pb-2 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pb-0">
+        <div className="flex items-center justify-between px-2.5 pt-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
             <span className="font-[var(--font-display)] text-base font-semibold tracking-tight">
               Sessions
@@ -97,7 +97,7 @@ export function SessionsPanel({
             <Button
               size="icon"
               variant="ghost"
-              className="rounded-full"
+              className="h-8 w-8 rounded-full"
               onClick={onToggleSidebar}
             >
               <PanelLeft className="h-4 w-4" />
@@ -107,14 +107,14 @@ export function SessionsPanel({
         <SidebarSeparator className="bg-black/10 group-data-[collapsible=icon]:hidden" />
       </SidebarHeader>
 
-      <SidebarContent className="px-3 pt-2 group-data-[collapsible=icon]:hidden">
-        <SidebarMenu className="gap-3">
+      <SidebarContent className="px-2.5 pt-1.5 group-data-[collapsible=icon]:hidden">
+        <SidebarMenu className="gap-2">
           {isLoadingSessions
             ? Array.from({ length: 2 }).map((_, index) => (
                 <SidebarMenuItem key={`session-skeleton-${index}`}>
-                  <div className="flex min-h-[68px] items-center gap-3 rounded-2xl bg-white/40 px-3 py-3.5 pr-11">
-                    <Skeleton className="h-8 w-8 rounded-full bg-muted/60" />
-                    <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex min-h-[58px] items-center gap-2.5 rounded-[20px] bg-white/40 px-3 py-2.5 pr-10">
+                    <Skeleton className="h-7 w-7 rounded-full bg-muted/60" />
+                    <div className="min-w-0 flex-1 space-y-1.5">
                       <div className="flex items-center gap-2">
                         <Skeleton className="h-3 w-28 rounded-md bg-muted/60" />
                         <Skeleton className="ml-auto h-3 w-20 rounded-md bg-muted/60" />
@@ -141,8 +141,8 @@ export function SessionsPanel({
                       isActive={item.id === activeSessionId}
                       tooltip={item.title}
                       className={cn(
-                        "rounded-2xl py-3.5 px-3 min-h-[68px] pr-11",
-                        "group-data-[collapsible=icon]:min-h-[52px] group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center",
+                        "min-h-[58px] rounded-[20px] px-3 py-2.5 pr-10",
+                        "group-data-[collapsible=icon]:min-h-[46px] group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center",
                         item.id === activeSessionId
                           ? "bg-white shadow-[0_18px_40px_-28px_rgba(32,24,70,0.6)]"
                           : "hover:bg-white/70"
@@ -151,13 +151,13 @@ export function SessionsPanel({
                         void onSelectSession(item);
                       }}
                     >
-                      <Avatar className="h-8 w-8 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9">
+                      <Avatar className="h-7 w-7 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
                         <AvatarFallback className="bg-[var(--user-bubble)] text-[10px] font-semibold group-data-[collapsible=icon]:text-xs">
                           {String(index + 1).padStart(2, "0")}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <span className="min-w-0 flex-1 truncate text-xs font-semibold">
                             {item.title}
                           </span>
@@ -178,7 +178,7 @@ export function SessionsPanel({
                       aria-label="Delete session"
                       disabled={isDeleting}
                       className={cn(
-                        "absolute right-3 top-3.5 h-7 w-7 rounded-full text-muted-foreground opacity-0 transition",
+                        "absolute right-2.5 top-2.5 h-6 w-6 rounded-full text-muted-foreground opacity-0 transition",
                         "hover:bg-red-500/10 hover:text-red-600",
                         item.id === activeSessionId && "opacity-100",
                         "group-hover:opacity-100"
@@ -201,7 +201,7 @@ export function SessionsPanel({
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="mt-auto px-3 pb-4">
+      <SidebarFooter className="mt-auto px-2.5 pb-3">
         <SidebarMenu className="gap-1">
           <Collapsible defaultOpen={false} className="group/settings">
             <SidebarMenuItem>
@@ -209,9 +209,9 @@ export function SessionsPanel({
                 <SidebarMenuButton
                   tooltip="Settings"
                   className={cn(
-                    "rounded-2xl px-3 py-2.5",
+                    "rounded-[20px] px-3 py-2",
                     "hover:bg-white/70",
-                    "group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center"
+                    "group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center"
                   )}
                 >
                   <Settings className="h-4 w-4" />

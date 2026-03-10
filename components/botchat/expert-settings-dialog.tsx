@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,7 +102,6 @@ export function ExpertSettingsDialog({
   onOpenChange,
   onExpertsUpdated,
 }: ExpertSettingsDialogProps) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [experts, setExperts] = useState<ExpertRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -178,52 +176,56 @@ export function ExpertSettingsDialog({
   const loadExperts = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    const { data, error: loadError } = await supabase
-      .from("experts")
-      .select(
-        "id, slug, name, agent_name, description, system_prompt, suggestion_question, sort_order, created_at"
-      )
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(200);
+    const response = await fetch("/api/experts");
 
-    if (loadError) {
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
       setIsLoading(false);
-      setError(loadError.message);
+      setError(body?.error || "Failed to load experts.");
       return;
     }
 
-    const rows = (data ?? []) as unknown as ExpertRow[];
+    const payload = (await response.json()) as { experts?: ExpertRow[] };
+    const rows = Array.isArray(payload.experts) ? payload.experts : [];
     setExperts(rows);
     onExpertsUpdated?.(rows);
     setIsLoading(false);
-  }, [onExpertsUpdated, supabase]);
+  }, [onExpertsUpdated]);
 
   const persistExpertOrder = useCallback(
     async (nextExperts: ExpertRow[]) => {
       setIsReordering(true);
       setError(null);
 
-      const results = await Promise.all(
-        nextExperts.map((expert) =>
-          supabase
-            .from("experts")
-            .update({ sort_order: expert.sort_order })
-            .eq("id", expert.id)
-        )
-      );
+      const response = await fetch("/api/experts/reorder", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          items: nextExperts.map((expert) => ({
+            id: expert.id,
+            sort_order: expert.sort_order,
+          })),
+        }),
+      });
 
-      const firstError = results.find((result) => result.error)?.error ?? null;
-      if (firstError) {
-        setError(firstError.message);
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setError(body?.error || "Failed to reorder experts.");
         setIsReordering(false);
         return;
       }
 
-      onExpertsUpdated?.(nextExperts);
+      const payload = (await response.json()) as { experts?: ExpertRow[] };
+      const rows = Array.isArray(payload.experts) ? payload.experts : nextExperts;
+      setExperts(rows);
+      onExpertsUpdated?.(rows);
       setIsReordering(false);
     },
-    [onExpertsUpdated, supabase]
+    [onExpertsUpdated]
   );
 
   useEffect(() => {
@@ -304,25 +306,34 @@ export function ExpertSettingsDialog({
 
       setDraft((prev) => ({ ...prev, slug: payload.slug, sort_order: payload.sort_order }));
 
-      if (draft.id) {
-        const { error: updateError } = await supabase
-          .from("experts")
-          .update(payload)
-          .eq("id", draft.id);
-        if (updateError) throw updateError;
-      } else {
-        const { data, error: insertError } = await supabase
-          .from("experts")
-          .insert(payload)
-          .select("id")
-          .single();
-        if (insertError) throw insertError;
-        if (data?.id) {
-          setSelectedId(String(data.id));
-        }
+      const response = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: draft.id,
+          ...payload,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(body?.error || "Failed to save expert.");
       }
 
-      await loadExperts();
+      const result = (await response.json()) as { experts?: ExpertRow[] };
+      const nextExperts = Array.isArray(result.experts) ? result.experts : [];
+      setExperts(nextExperts);
+      onExpertsUpdated?.(nextExperts);
+
+      const refreshedSelection =
+        draft.id ??
+        nextExperts.find((expert) => expert.slug === payload.slug)?.id ??
+        null;
+      if (refreshedSelection) {
+        setSelectedId(refreshedSelection);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save expert.");
     } finally {
@@ -371,9 +382,12 @@ export function ExpertSettingsDialog({
           | null;
         throw new Error(body?.error || (await response.text()));
       }
+      const result = (await response.json()) as { experts?: ExpertRow[] };
+      const nextExperts = Array.isArray(result.experts) ? result.experts : [];
+      setExperts(nextExperts);
+      onExpertsUpdated?.(nextExperts);
       setSelectedId(null);
       setDraft(defaultDraft());
-      await loadExperts();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete expert.");
     } finally {

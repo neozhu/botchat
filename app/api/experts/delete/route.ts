@@ -1,4 +1,9 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { revalidateTag } from "next/cache";
+import {
+  BOTCHAT_EXPERTS_TAG,
+  deleteExpertById,
+  loadExperts,
+} from "@/lib/botchat/server-data";
 
 export const runtime = "nodejs";
 
@@ -18,12 +23,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const supabase = createSupabaseServerClient();
-    const { error } = await supabase.from("experts").delete().eq("id", id);
-    if (error) {
-      return Response.json({ error: error.message }, { status: 400 });
-    }
-    return Response.json({ ok: true });
+    await deleteExpertById(id);
+    revalidateTag(BOTCHAT_EXPERTS_TAG, "max");
+    const experts = await loadExperts();
+    return Response.json({ ok: true, experts });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to delete expert.";

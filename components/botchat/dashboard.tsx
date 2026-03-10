@@ -78,6 +78,18 @@ const expertSeeds = [
       "Can you troubleshoot this step-by-step? My suitcase (handle/wheels/lock) is not working properly.",
     sort_order: 3,
   },
+  {
+    slug: "friendly-translator",
+    name: "Friendly Translator",
+    agent_name: "Luna",
+    description:
+      "Daily conversation translator: EN/DE → 中文, 中文 → English, with natural and polite phrasing.",
+    system_prompt:
+      "You are a translation agent for everyday conversation. Output only the translated text and do not answer questions or add explanations. If the user input is Chinese, translate it into natural, friendly English. If the user input is English or German, translate it into natural, polite Chinese. Prefer common expressions, keep the tone warm and courteous, avoid overly formal style, and avoid rare words.",
+    suggestion_question:
+      "请帮我翻译这句话：Could you let me know when you arrive?",
+    sort_order: 4,
+  },
 ];
 
 function messageText(message: UIMessage) {
@@ -364,8 +376,11 @@ export default function BotchatDashboard() {
 
         if (cancelled) return;
 
-        if (!existingExperts || existingExperts.length === 0) {
-          await supabase.from("experts").upsert(expertSeeds, {
+        const existingSlugs = new Set((existingExperts ?? []).map((expert) => expert.slug));
+        const missingSeeds = expertSeeds.filter((seed) => !existingSlugs.has(seed.slug));
+
+        if (missingSeeds.length > 0) {
+          await supabase.from("experts").upsert(missingSeeds, {
             onConflict: "slug",
           });
         }
@@ -554,6 +569,9 @@ export default function BotchatDashboard() {
     const expertIdAtSend = activeExpertId;
     const abort = new AbortController();
 
+    setInput("");
+    setPendingFiles([]);
+
     inFlightAbortRef.current?.abort();
     inFlightAbortRef.current = abort;
 
@@ -614,8 +632,6 @@ export default function BotchatDashboard() {
           );
         }
 
-        setInput("");
-        setPendingFiles([]);
       } catch (error) {
         if ((error as { name?: string }).name === "AbortError") return;
         console.error("Failed to send message with attachments", error);

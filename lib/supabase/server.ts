@@ -7,18 +7,10 @@ function requireEnv(name: string) {
 }
 
 export function createSupabaseServerClient() {
-  const url =
-    process.env.SUPABASE_URL ??
-    process.env.NEXT_PUBLIC_SUPABASE_URL ??
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const anonKey =
-    process.env.SUPABASE_ANON_KEY ??
-    process.env.SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    requireEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+  const url = requireEnv("PUBLIC_SUPABASE_URL");
+  const publishableKey = requireEnv("PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY");
 
-  return createClient(url, anonKey, {
+  return createClient(url, publishableKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,

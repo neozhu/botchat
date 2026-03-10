@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const maxDuration = 30;
 
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     parts: (m as UIMessage).parts ?? [],
   }));
 
-  const supabase = createSupabaseAdminClient();
+  const supabase = createSupabaseServerClient();
 
   const { error: upsertError } = await supabase
     .from("chat_messages")

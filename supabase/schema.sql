@@ -64,28 +64,53 @@ alter table public.chat_messages enable row level security;
 
 drop policy if exists "anon read experts" on public.experts;
 drop policy if exists "anon write experts" on public.experts;
+drop policy if exists "anon update experts" on public.experts;
+drop policy if exists "anon delete experts" on public.experts;
 create policy "anon read experts" on public.experts
   for select to anon using (true);
 create policy "anon write experts" on public.experts
   for insert to anon with check (true);
 create policy "anon update experts" on public.experts
   for update to anon using (true) with check (true);
+create policy "anon delete experts" on public.experts
+  for delete to anon using (true);
 
 drop policy if exists "anon read sessions" on public.chat_sessions;
 drop policy if exists "anon write sessions" on public.chat_sessions;
+drop policy if exists "anon update sessions" on public.chat_sessions;
+drop policy if exists "anon delete sessions" on public.chat_sessions;
 create policy "anon read sessions" on public.chat_sessions
   for select to anon using (true);
 create policy "anon write sessions" on public.chat_sessions
   for insert to anon with check (true);
 create policy "anon update sessions" on public.chat_sessions
   for update to anon using (true) with check (true);
+create policy "anon delete sessions" on public.chat_sessions
+  for delete to anon using (true);
 
 drop policy if exists "anon read messages" on public.chat_messages;
 drop policy if exists "anon write messages" on public.chat_messages;
+drop policy if exists "anon update messages" on public.chat_messages;
+drop policy if exists "anon delete messages" on public.chat_messages;
 create policy "anon read messages" on public.chat_messages
   for select to anon using (true);
 create policy "anon write messages" on public.chat_messages
   for insert to anon with check (true);
 create policy "anon update messages" on public.chat_messages
   for update to anon using (true) with check (true);
+create policy "anon delete messages" on public.chat_messages
+  for delete to anon using (true);
 
+
+
+-- Storage policies for public `chat-attachments` bucket.
+-- Run after creating the bucket in Storage.
+drop policy if exists "anon read chat attachments" on storage.objects;
+drop policy if exists "anon upload chat attachments" on storage.objects;
+create policy "anon read chat attachments" on storage.objects
+  for select to anon
+  using (bucket_id = 'chat-attachments');
+
+create policy "anon upload chat attachments" on storage.objects
+  for insert to anon
+  with check (bucket_id = 'chat-attachments');

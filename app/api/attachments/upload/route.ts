@@ -1,5 +1,5 @@
 import type { FileUIPart } from "ai";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -8,23 +8,6 @@ const BUCKET = "chat-attachments";
 function safeFilename(name: string) {
   const cleaned = name.trim().replace(/[^\w.\-]+/g, "_");
   return cleaned.length > 120 ? cleaned.slice(-120) : cleaned || "file";
-}
-
-async function ensureBucket() {
-  const supabase = createSupabaseAdminClient();
-  const { data: buckets, error } = await supabase.storage.listBuckets();
-  if (error) throw error;
-  if (buckets?.some((b) => b.name === BUCKET)) return;
-
-  const { error: createError } = await supabase.storage.createBucket(BUCKET, {
-    public: true,
-    fileSizeLimit: 25 * 1024 * 1024,
-  });
-
-  if (createError) {
-    const message = String(createError.message ?? "");
-    if (!message.toLowerCase().includes("already exists")) throw createError;
-  }
 }
 
 export async function POST(request: Request) {
@@ -38,9 +21,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "No files provided." }, { status: 400 });
     }
 
-    await ensureBucket();
-
-    const supabase = createSupabaseAdminClient();
+    const supabase = createSupabaseServerClient();
     const uploaded: FileUIPart[] = [];
 
     for (const file of files) {

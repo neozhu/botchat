@@ -35,10 +35,8 @@ Required:
 
 Supabase (recommended for sessions/experts/attachments):
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`)
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY` (required for attachment uploads + message persistence routes)
+- `PUBLIC_SUPABASE_URL`
+- `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 
 ### 2) Run
 
@@ -53,7 +51,7 @@ Open `http://localhost:3000`.
 
 1. Create a Supabase project.
 2. Run `supabase/schema.sql` in the Supabase SQL Editor (this project uses a simple “no-auth” RLS policy for anon read/write).
-3. (Optional) Attachments are stored in a public bucket named `chat-attachments` and created automatically on first upload.
+3. Create a public Storage bucket named `chat-attachments` and allow anon uploads/reads for that bucket.
 
 ## Docker
 
@@ -65,7 +63,7 @@ docker compose up -d --build
 
 App is exposed at `http://localhost:3202` (mapped from container `3000`).
 
-Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, and your Supabase vars in your deployment platform or `docker-compose.yml`.
+Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `PUBLIC_SUPABASE_URL`, and `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` in your deployment platform or `docker-compose.yml`.
 
 ## Project structure
 

@@ -1,6 +1,7 @@
 import { convertToModelMessages, stepCountIs, streamText, tool } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import { normalizeReasoningEffort } from "@/lib/ai/reasoning-effort";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOpenAIModelId } from "@/lib/ai/openai";
 
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
   const messages = await Promise.resolve(body.messages);
   const sessionId: string | undefined = body?.sessionId;
   const expertId: string | undefined = body?.expertId;
+  const reasoningEffort = normalizeReasoningEffort(body?.reasoningEffort);
 
   if (!Array.isArray(messages)) {
     return new Response(
@@ -135,6 +137,11 @@ export async function POST(request: Request) {
   const modelMessages = await convertToModelMessages(messages);
   const result = streamText({
     model: openai(getOpenAIModelId()),
+    providerOptions: {
+      openai: {
+        reasoningEffort,
+      },
+    },
     system,
     messages: modelMessages,
     tools: {

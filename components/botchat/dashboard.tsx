@@ -7,6 +7,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { ChatPanel } from "@/components/botchat/chat-panel";
 import { SessionsPanel } from "@/components/botchat/sessions-panel";
+import { getReasoningEffortFromToggle } from "@/lib/ai/reasoning-effort";
 import type {
   BotchatBootstrapData,
   ExpertRow,
@@ -88,6 +89,7 @@ export default function BotchatDashboard({
   );
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [isHighReasoning, setIsHighReasoning] = useState(false);
   const [messageTimestamps, setMessageTimestamps] = useState<
     Record<string, string>
   >(() => initialData.messageTimestamps);
@@ -471,6 +473,7 @@ export default function BotchatDashboard({
 
     const sessionIdAtSend = activeSessionId;
     const expertIdAtSend = activeExpertId;
+    const reasoningEffortAtSend = getReasoningEffortFromToggle(isHighReasoning);
     const abort = new AbortController();
 
     setInput("");
@@ -527,12 +530,24 @@ export default function BotchatDashboard({
         if (hasText) {
           await sendMessage(
             { text: trimmed, files: uploadedFiles },
-            { body: { sessionId: sessionIdAtSend, expertId: expertIdAtSend } }
+            {
+              body: {
+                sessionId: sessionIdAtSend,
+                expertId: expertIdAtSend,
+                reasoningEffort: reasoningEffortAtSend,
+              },
+            }
           );
         } else if (uploadedFiles) {
           await sendMessage(
             { files: uploadedFiles },
-            { body: { sessionId: sessionIdAtSend, expertId: expertIdAtSend } }
+            {
+              body: {
+                sessionId: sessionIdAtSend,
+                expertId: expertIdAtSend,
+                reasoningEffort: reasoningEffortAtSend,
+              },
+            }
           );
         }
 
@@ -579,6 +594,8 @@ export default function BotchatDashboard({
         status={status}
         input={input}
         setInput={setInput}
+        isHighReasoning={isHighReasoning}
+        onToggleReasoning={() => setIsHighReasoning((value) => !value)}
         onSubmit={onSubmit}
         onCreateSessionForExpert={handleCreateSessionForExpert}
         pendingFiles={pendingFiles}

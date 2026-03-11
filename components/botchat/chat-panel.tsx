@@ -26,6 +26,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { getActiveExpertCardDetails } from "@/lib/botchat/active-expert-card";
 import { cn } from "@/lib/utils";
 import {
+  Brain,
   Hash,
   Check,
   Copy,
@@ -77,6 +78,8 @@ export type ChatPanelProps = {
   status: string;
   input: string;
   setInput: (value: string) => void;
+  isHighReasoning: boolean;
+  onToggleReasoning: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCreateSessionForExpert: (expertId: string) => void | Promise<void>;
   pendingFiles: File[];
@@ -343,6 +346,8 @@ export function ChatPanel({
   status,
   input,
   setInput,
+  isHighReasoning,
+  onToggleReasoning,
   onSubmit,
   onCreateSessionForExpert,
   pendingFiles,
@@ -691,6 +696,12 @@ export function ChatPanel({
                     <ToolbarIcon icon={MessageCircle} label="Message type" />
                     <ToolbarIcon icon={Mic} label="Voice note" />
                     <ToolbarIcon icon={Hash} label="Topic tags" />
+                    <ToolbarIcon
+                      icon={Brain}
+                      label={isHighReasoning ? "Reasoning: High" : "Reasoning: Low"}
+                      highlight={isHighReasoning}
+                      onClick={onToggleReasoning}
+                    />
                     <ToolbarIcon
                       icon={Paperclip}
                       label="Attach files"

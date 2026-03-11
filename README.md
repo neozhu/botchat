@@ -2,7 +2,7 @@
 
 # Botchat
 
-**A clean, fast chat dashboard with expert personas, streaming replies, attachments, and readable code blocks.**
+**A clean, fast chat dashboard with expert personas, authenticated personal workspaces, streaming replies, attachments, and readable code blocks.**
 
 Built with **Next.js (App Router)** + **Vercel AI SDK** + **Supabase**.
 
@@ -13,7 +13,9 @@ Built with **Next.js (App Router)** + **Vercel AI SDK** + **Supabase**.
 ## What you get
 
 - **Expert personas**: switch between different “experts” with their own system prompts.
+- **Supabase Auth**: sign up, sign in, sign out, and change password flows are built in.
 - **Multi-session chat**: sessions list + titles + last-message preview.
+- **User-isolated chat history**: sessions and messages are scoped to the authenticated user.
 - **Streaming responses**: responsive UI while the model streams tokens.
 - **Attachments**: upload images/files to Supabase Storage and send them with messages.
 - **Markdown + code blocks**: readable rendering with syntax highlighting.
@@ -47,11 +49,22 @@ bun dev
 
 Open `http://localhost:3000`.
 
+Authentication UI is available at `http://localhost:3000/auth`.
+
 ## Supabase setup
 
 1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the Supabase SQL Editor (this project uses a simple “no-auth” RLS policy for anon read/write).
-3. Create a public Storage bucket named `chat-attachments` and allow anon uploads/reads for that bucket.
+2. Run `supabase/schema.sql` in the Supabase SQL Editor.
+3. Enable Supabase Auth email/password sign-in for the project.
+4. If email confirmation is enabled, new users must activate their account from email before signing in.
+5. Create a public Storage bucket named `chat-attachments`.
+
+The database schema now assumes authenticated access:
+
+- `chat_sessions.user_id` owns each chat session.
+- `chat_messages` inherit ownership through `session_id`.
+- Row Level Security allows users to read/write only their own sessions and messages.
+- `experts` remain global/shared and are not user-owned.
 
 ## Docker
 

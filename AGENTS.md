@@ -82,6 +82,8 @@ When working in this repo, optimize for:
 ## Working Rules for AI Agents
 
 - Prefer small, targeted changes that preserve the current server-first bootstrap plus client-orchestrated chat model.
+- Once the user has clearly specified the implementation goal, proceed directly with the code changes instead of asking for repeated confirmation before each edit.
+- Only stop to ask follow-up questions when the requirement is genuinely ambiguous, the change would materially expand scope, or a destructive action is required.
 - Do not replace `useChat` flow in [`components/botchat/dashboard.tsx`](D:\github\botchat\components\botchat\dashboard.tsx) unless the task specifically requires it.
 - Do not hardcode model names in feature code. Follow the existing model helper in [`lib/ai/openai.ts`](D:\github\botchat\lib\ai\openai.ts).
 - When changing expert behavior, inspect both the expert dialog and the related expert API routes before editing.

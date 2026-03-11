@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getActiveExpertCardDetails } from "@/lib/botchat/active-expert-card";
 import { cn } from "@/lib/utils";
 import {
   Hash,
@@ -348,6 +349,7 @@ export function ChatPanel({
   setPendingFiles,
   isUploadingAttachments,
 }: ChatPanelProps) {
+  const activeExpertCard = getActiveExpertCardDetails(activeExpert);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const previews = useMemo(
@@ -499,18 +501,14 @@ export function ChatPanel({
                         Active expert
                       </p>
                       <p className="text-sm font-semibold">
-                        {activeExpert?.name ?? "Assistant"}
+                        {activeExpertCard.name}
                       </p>
                     </div>
-                    {activeExpert?.description ? (
+                    {activeExpertCard.description ? (
                       <p className="text-xs text-muted-foreground">
-                        {activeExpert.description}
+                        {activeExpertCard.description}
                       </p>
                     ) : null}
-                    <div className="rounded-lg border border-border/60 bg-muted/40 p-2 text-[11px] leading-relaxed text-foreground/80">
-                      {activeExpert?.system_prompt ??
-                        "You are a premium luggage brand assistant."}
-                    </div>
                   </div>
                 </HoverCardContent>
               </HoverCard>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { signOutAction } from "@/app/auth/actions";
+import { ChangePasswordDialog } from "@/components/botchat/change-password-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,16 @@ import {
 } from "@/components/ui/sidebar";
 import { ExpertSettingsDialog } from "@/components/botchat/expert-settings-dialog";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Loader2, PanelLeft, Settings, SlidersHorizontal, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  KeyRound,
+  Loader2,
+  LogOut,
+  PanelLeft,
+  Settings,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 
 type SessionItem = {
   id: string;
@@ -72,6 +83,7 @@ export function SessionsPanel({
   onExpertsUpdated,
 }: SessionsPanelProps) {
   const [expertDialogOpen, setExpertDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
   return (
     <Sidebar
@@ -223,6 +235,9 @@ export function SessionsPanel({
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenuSub className="mt-1">
+                  <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Workspace
+                  </p>
                   <SidebarMenuSubItem>
                     <SidebarMenuSubButton asChild>
                       <button
@@ -234,6 +249,30 @@ export function SessionsPanel({
                       </button>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
+                  <p className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Account
+                  </p>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild>
+                      <button
+                        type="button"
+                        onClick={() => setPasswordDialogOpen(true)}
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        <span className="text-xs">Change password</span>
+                      </button>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <form action={signOutAction}>
+                      <SidebarMenuSubButton asChild>
+                        <button type="submit">
+                          <LogOut className="h-4 w-4" />
+                          <span className="text-xs">Log out</span>
+                        </button>
+                      </SidebarMenuSubButton>
+                    </form>
+                  </SidebarMenuSubItem>
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>
@@ -244,6 +283,10 @@ export function SessionsPanel({
           open={expertDialogOpen}
           onOpenChange={setExpertDialogOpen}
           onExpertsUpdated={onExpertsUpdated}
+        />
+        <ChangePasswordDialog
+          open={passwordDialogOpen}
+          onOpenChange={setPasswordDialogOpen}
         />
       </SidebarFooter>
     </Sidebar>

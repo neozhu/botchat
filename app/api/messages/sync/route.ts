@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     parts: (m as UIMessage).parts ?? [],
   }));
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { error: upsertError } = await supabase
     .from("chat_messages")

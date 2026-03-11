@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase
     .from("chat_sessions")

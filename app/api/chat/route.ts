@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     "You are a premium luggage brand assistant. Be concise, confident, and proactive with tasteful product suggestions.";
 
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     if (sessionId) {
       const { data } = await supabase
         .from("chat_sessions")

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "No files provided." }, { status: 400 });
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const uploaded: FileUIPart[] = [];
 
     for (const file of files) {

@@ -1,10 +1,12 @@
 import "server-only";
 
 import type { UIMessage } from "ai";
-import { unstable_cache } from "next/cache";
 import { cache } from "react";
+import { getCurrentUser } from "@/lib/auth/user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { expertSeeds } from "@/lib/botchat/expert-seeds";
+import { shouldSeedExperts } from "@/lib/botchat/expert-seeding";
+import { buildSessionInsertPayload } from "@/lib/botchat/session-payload";
 import type { ExpertRow, SessionRow } from "@/lib/botchat/types";
 
 export const BOTCHAT_EXPERTS_TAG = "botchat-experts";
@@ -52,7 +54,7 @@ function toTimestampMap(rows: MessageRow[]) {
 }
 
 async function fetchExpertsFresh() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("experts")
     .select(
@@ -65,23 +67,29 @@ async function fetchExpertsFresh() {
   return (data ?? []) as ExpertRow[];
 }
 
-const fetchExpertsCached = unstable_cache(fetchExpertsFresh, ["botchat-experts"], {
-  revalidate: 60,
-  tags: [BOTCHAT_EXPERTS_TAG],
-});
-
 const ensureExpertSeeds = cache(async () => {
-  const supabase = createSupabaseServerClient();
+  const user = await getCurrentUser();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.from("experts").select("slug");
 
   if (error) throw new Error(error.message);
 
-  const existingSlugs = new Set(
-    (data ?? [])
-      .map((row) => row.slug)
-      .filter((slug): slug is string => typeof slug === "string")
-  );
-  const missingSeeds = expertSeeds.filter((seed) => !existingSlugs.has(seed.slug));
+  const existingSlugs = (data ?? [])
+    .map((row) => row.slug)
+    .filter((slug): slug is string => typeof slug === "string");
+
+  if (
+    !shouldSeedExperts(
+      Boolean(user),
+      existingSlugs,
+      expertSeeds.map((seed) => seed.slug)
+    )
+  ) {
+    return false;
+  }
+
+  const existingSlugSet = new Set(existingSlugs);
+  const missingSeeds = expertSeeds.filter((seed) => !existingSlugSet.has(seed.slug));
 
   if (missingSeeds.length === 0) return false;
 
@@ -94,12 +102,12 @@ const ensureExpertSeeds = cache(async () => {
 });
 
 export const loadExperts = cache(async () => {
-  const didSeed = await ensureExpertSeeds();
-  return didSeed ? fetchExpertsFresh() : fetchExpertsCached();
+  await ensureExpertSeeds();
+  return fetchExpertsFresh();
 });
 
 export const loadSessions = cache(async () => {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("chat_sessions")
     .select("id, expert_id, title, last_message, created_at, updated_at")
@@ -111,7 +119,7 @@ export const loadSessions = cache(async () => {
 });
 
 export const loadMessagesForSession = cache(async (sessionId: string) => {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("chat_messages")
     .select("ui_message_id, role, parts, created_at")
@@ -127,11 +135,11 @@ export const loadMessagesForSession = cache(async (sessionId: string) => {
   } satisfies SessionMessagesPayload;
 });
 
-export async function createSessionForExpert(expertId: string) {
-  const supabase = createSupabaseServerClient();
+export async function createSessionForExpert(userId: string, expertId: string) {
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("chat_sessions")
-    .insert({ expert_id: expertId, title: "New chat" })
+    .insert(buildSessionInsertPayload(userId, expertId))
     .select("id, expert_id, title, last_message, created_at, updated_at")
     .single();
 
@@ -140,7 +148,7 @@ export async function createSessionForExpert(expertId: string) {
 }
 
 export async function saveExpert(input: SaveExpertInput) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const payload = {
     slug: input.slug,
     name: input.name,
@@ -168,7 +176,7 @@ export async function saveExpert(input: SaveExpertInput) {
 }
 
 export async function deleteExpertById(id: string) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("experts").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
@@ -176,7 +184,7 @@ export async function deleteExpertById(id: string) {
 export async function persistExpertOrder(
   items: Array<{ id: string; sort_order: number }>
 ) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const results = await Promise.all(
     items.map((item) =>

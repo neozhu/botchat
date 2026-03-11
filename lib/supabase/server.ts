@@ -1,19 +1,28 @@
-import { createClient } from "@supabase/supabase-js";
+import "server-only";
 
-function requireEnv(name: string) {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing env var: ${name}`);
-  return value;
-}
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { getSupabaseEnv } from "@/lib/supabase/env";
 
-export function createSupabaseServerClient() {
-  const url = requireEnv("PUBLIC_SUPABASE_URL");
-  const publishableKey = requireEnv("PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY");
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
+  const { url, publishableKey } = getSupabaseEnv();
 
-  return createClient(url, publishableKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+  return createServerClient(url, publishableKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Read-only server contexts can ignore cookie writes because the
+          // proxy refresh path handles session persistence.
+        }
+      },
     },
   });
 }

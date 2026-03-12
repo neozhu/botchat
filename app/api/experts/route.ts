@@ -2,8 +2,10 @@ import { revalidateTag } from "next/cache";
 import {
   BOTCHAT_EXPERTS_TAG,
   loadExperts,
+  loadExpertsFresh,
   saveExpert,
 } from "@/lib/botchat/server-data";
+import { getDuplicateExpertNameError } from "@/lib/botchat/expert-settings";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -39,6 +41,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    const existingExperts = await loadExpertsFresh();
+    const duplicateNameError = getDuplicateExpertNameError(existingExperts, {
+      id: typeof body.id === "string" ? body.id : undefined,
+      name,
+    });
+    if (duplicateNameError) {
+      return Response.json({ error: duplicateNameError }, { status: 409 });
+    }
+
     await saveExpert({
       id: typeof body.id === "string" ? body.id : undefined,
       slug: typeof body.slug === "string" ? body.slug.trim() : "",
@@ -62,7 +73,7 @@ export async function POST(request: Request) {
 
     revalidateTag(BOTCHAT_EXPERTS_TAG, "max");
 
-    const experts = await loadExperts();
+    const experts = await loadExpertsFresh();
     return Response.json({ experts });
   } catch (error) {
     const message =

@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import {
+  getExpertListIntroTimeoutMs,
+  formatExpertSaveError,
+  getExpertRowIntroStyle,
+  getDuplicateExpertNameError,
+  resolveSelectedExpertId,
+} from "@/lib/botchat/expert-settings";
+import type { ExpertRow } from "@/lib/botchat/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,18 +35,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { z } from "zod";
-
-type ExpertRow = {
-  id: string;
-  slug: string;
-  name: string;
-  agent_name: string;
-  description: string | null;
-  system_prompt: string;
-  suggestion_question: string | null;
-  sort_order: number;
-  created_at: string;
-};
 
 type ExpertDraft = {
   id?: string;
@@ -114,11 +110,14 @@ export function ExpertSettingsDialog({
   const [draft, setDraft] = useState<ExpertDraft>(() => defaultDraft());
   const [copied, setCopied] = useState<null | "system_prompt" | "suggestion_question">(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [isAnimatingListIntro, setIsAnimatingListIntro] = useState(false);
   const wasDirtyRef = useRef(false);
   const lastSyncedSelectedIdRef = useRef<string | null>(null);
   const expertsRef = useRef<ExpertRow[]>([]);
   const draggingIdRef = useRef<string | null>(null);
   const dragStartOrderRef = useRef<string[] | null>(null);
+  const preserveEmptySelectionRef = useRef(false);
+  const introAnimationTimeoutRef = useRef<number | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -173,6 +172,14 @@ export function ExpertSettingsDialog({
     expertsRef.current = experts;
   }, [experts]);
 
+  const stopListIntroAnimation = useCallback(() => {
+    if (introAnimationTimeoutRef.current !== null) {
+      window.clearTimeout(introAnimationTimeoutRef.current);
+      introAnimationTimeoutRef.current = null;
+    }
+    setIsAnimatingListIntro(false);
+  }, []);
+
   const loadExperts = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -190,9 +197,22 @@ export function ExpertSettingsDialog({
     const payload = (await response.json()) as { experts?: ExpertRow[] };
     const rows = Array.isArray(payload.experts) ? payload.experts : [];
     setExperts(rows);
+    setSelectedId((current) =>
+      resolveSelectedExpertId(rows, current, {
+        preserveEmptySelection: preserveEmptySelectionRef.current,
+      })
+    );
+    stopListIntroAnimation();
+    if (rows.length > 0) {
+      setIsAnimatingListIntro(true);
+      introAnimationTimeoutRef.current = window.setTimeout(() => {
+        setIsAnimatingListIntro(false);
+        introAnimationTimeoutRef.current = null;
+      }, getExpertListIntroTimeoutMs(rows.length));
+    }
     onExpertsUpdated?.(rows);
     setIsLoading(false);
-  }, [onExpertsUpdated]);
+  }, [onExpertsUpdated, stopListIntroAnimation]);
 
   const persistExpertOrder = useCallback(
     async (nextExperts: ExpertRow[]) => {
@@ -234,6 +254,15 @@ export function ExpertSettingsDialog({
   }, [loadExperts, open]);
 
   useEffect(() => {
+    if (open) return;
+    preserveEmptySelectionRef.current = false;
+    lastSyncedSelectedIdRef.current = null;
+    stopListIntroAnimation();
+  }, [open, stopListIntroAnimation]);
+
+  useEffect(() => stopListIntroAnimation, [stopListIntroAnimation]);
+
+  useEffect(() => {
     if (!open) return;
     if (!selected) return;
     const sameSelection = lastSyncedSelectedIdRef.current === selected.id;
@@ -256,6 +285,7 @@ export function ExpertSettingsDialog({
       const ok = window.confirm("Discard unsaved changes?");
       if (!ok) return;
     }
+    preserveEmptySelectionRef.current = true;
     setSelectedId(null);
     setDraft(defaultDraft());
     setError(null);
@@ -267,6 +297,7 @@ export function ExpertSettingsDialog({
       const ok = window.confirm("Discard unsaved changes?");
       if (!ok) return;
     }
+    preserveEmptySelectionRef.current = false;
     setSelectedId(expertId);
     setError(null);
   };
@@ -304,6 +335,16 @@ export function ExpertSettingsDialog({
         return;
       }
 
+      const duplicateNameError = getDuplicateExpertNameError(experts, {
+        id: draft.id,
+        name: payload.name,
+      });
+      if (duplicateNameError) {
+        setError(duplicateNameError);
+        setIsSaving(false);
+        return;
+      }
+
       setDraft((prev) => ({ ...prev, slug: payload.slug, sort_order: payload.sort_order }));
 
       const response = await fetch("/api/experts", {
@@ -332,10 +373,16 @@ export function ExpertSettingsDialog({
         nextExperts.find((expert) => expert.slug === payload.slug)?.id ??
         null;
       if (refreshedSelection) {
+        preserveEmptySelectionRef.current = false;
         setSelectedId(refreshedSelection);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save expert.");
+      setError(
+        formatExpertSaveError(e instanceof Error ? e.message : null, experts, {
+          id: draft.id,
+          name: draft.name,
+        })
+      );
     } finally {
       setIsSaving(false);
     }
@@ -350,6 +397,7 @@ export function ExpertSettingsDialog({
 
     const nextSlugBase = `${selected.slug}-copy`;
     const suffix = Math.random().toString(36).slice(2, 6);
+    preserveEmptySelectionRef.current = true;
     setSelectedId(null);
     setDraft({
       slug: `${nextSlugBase}-${suffix}`.slice(0, 48),
@@ -386,6 +434,7 @@ export function ExpertSettingsDialog({
       const nextExperts = Array.isArray(result.experts) ? result.experts : [];
       setExperts(nextExperts);
       onExpertsUpdated?.(nextExperts);
+      preserveEmptySelectionRef.current = true;
       setSelectedId(null);
       setDraft(defaultDraft());
     } catch (e) {
@@ -521,19 +570,24 @@ export function ExpertSettingsDialog({
                     No experts found.
                   </div>
                 ) : (
-                  filtered.map((expert) => {
+                  filtered.map((expert, index) => {
                     const isActive = expert.id === selectedId;
                     const isDragging = draggingId === expert.id;
+                    const introStyle = getExpertRowIntroStyle(index, isAnimatingListIntro);
 
                     return (
                       <div
                         key={expert.id}
                         data-expert-row
                         data-expert-id={expert.id}
+                        data-selected={isActive ? "true" : "false"}
+                        style={introStyle}
                         className={cn(
                           "group flex w-full items-stretch gap-1 rounded-2xl border p-1 transition",
+                          isAnimatingListIntro &&
+                            "motion-safe:animate-expert-list-intro motion-reduce:animate-none",
                           isActive
-                            ? "border-[var(--accent-line)]/30 bg-white shadow-[0_16px_40px_-28px_rgba(32,24,70,0.55)]"
+                            ? "border-[var(--accent-line)]/55 bg-[color-mix(in_oklab,var(--accent-line)_9%,white)] shadow-[0_18px_44px_-28px_rgba(32,24,70,0.55)] ring-1 ring-[var(--accent-line)]/25"
                             : "border-black/10 bg-white/60 hover:bg-white",
                           isDragging && "opacity-70"
                         )}
@@ -636,15 +690,28 @@ export function ExpertSettingsDialog({
                         <button
                           type="button"
                           onClick={() => selectExpert(expert.id)}
-                          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl py-1 text-left"
+                          className={cn(
+                            "flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-1 text-left transition",
+                            isActive && "text-foreground"
+                          )}
                         >
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-xs font-semibold">{expert.name}</p>
-                            <p className="truncate text-[11px] text-muted-foreground">
+                            <p
+                              className={cn(
+                                "truncate text-[11px] text-muted-foreground",
+                                isActive && "text-foreground/70"
+                              )}
+                            >
                               {expert.agent_name} · {expert.slug ?? ""}
                             </p>
                           </div>
-                          <ChevronRight className="h-4 w-4 opacity-60 transition group-hover:opacity-90" />
+                          <ChevronRight
+                            className={cn(
+                              "h-4 w-4 opacity-60 transition group-hover:opacity-90",
+                              isActive && "translate-x-0.5 opacity-100 text-[var(--accent-line)]"
+                            )}
+                          />
                         </button>
                       </div>
                     );

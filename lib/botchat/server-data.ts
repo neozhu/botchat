@@ -53,7 +53,7 @@ function toTimestampMap(rows: MessageRow[]) {
   }, {});
 }
 
-async function fetchExpertsFresh() {
+export async function loadExpertsFresh() {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("experts")
@@ -103,7 +103,7 @@ const ensureExpertSeeds = cache(async () => {
 
 export const loadExperts = cache(async () => {
   await ensureExpertSeeds();
-  return fetchExpertsFresh();
+  return loadExpertsFresh();
 });
 
 export const loadSessions = cache(async () => {

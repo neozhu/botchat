@@ -762,12 +762,6 @@ export function ChatPanel({
                       </button>
                     ))}
               </div>
-
-              {activeExpert ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {activeExpert.description}
-                </p>
-              ) : null}
             </form>
           </div>
         </section>

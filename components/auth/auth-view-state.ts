@@ -8,9 +8,14 @@ type SignUpStateLike = {
 
 export function getAuthScreen(
   selectedMode: Exclude<AuthScreenMode, "check-email">,
-  signUpState: SignUpStateLike
+  signUpState: SignUpStateLike,
+  checkEmailDismissed: boolean
 ): AuthScreenMode {
-  if (signUpState.pendingEmail && !signUpState.error) {
+  if (
+    signUpState.pendingEmail &&
+    !signUpState.error &&
+    !checkEmailDismissed
+  ) {
     return "check-email";
   }
 

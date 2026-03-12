@@ -4,6 +4,8 @@
 
 **A clean, fast chat dashboard with expert personas, authenticated personal workspaces, streaming replies, attachments, and readable code blocks.**
 
+[![CI](https://github.com/neozhu/botchat/actions/workflows/ci.yml/badge.svg)](https://github.com/neozhu/botchat/actions/workflows/ci.yml)
+
 Built with **Next.js (App Router)** + **Vercel AI SDK** + **Supabase**.
 
 </div>

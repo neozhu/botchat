@@ -30,6 +30,7 @@ import {
   Hash,
   Check,
   Copy,
+  Globe,
   Info,
   MessageCircle,
   Mic,
@@ -79,7 +80,9 @@ export type ChatPanelProps = {
   input: string;
   setInput: (value: string) => void;
   isHighReasoning: boolean;
+  isWebSearchEnabled: boolean;
   onToggleReasoning: () => void;
+  onToggleWebSearch: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCreateSessionForExpert: (expertId: string) => void | Promise<void>;
   pendingFiles: File[];
@@ -347,7 +350,9 @@ export function ChatPanel({
   input,
   setInput,
   isHighReasoning,
+  isWebSearchEnabled,
   onToggleReasoning,
+  onToggleWebSearch,
   onSubmit,
   onCreateSessionForExpert,
   pendingFiles,
@@ -701,6 +706,16 @@ export function ChatPanel({
                       label={isHighReasoning ? "Reasoning: High" : "Reasoning: Low"}
                       highlight={isHighReasoning}
                       onClick={onToggleReasoning}
+                    />
+                    <ToolbarIcon
+                      icon={Globe}
+                      label={
+                        isWebSearchEnabled
+                          ? "Web search: On"
+                          : "Web search: Off"
+                      }
+                      highlight={isWebSearchEnabled}
+                      onClick={onToggleWebSearch}
                     />
                     <ToolbarIcon
                       icon={Paperclip}

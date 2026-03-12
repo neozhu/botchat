@@ -90,6 +90,7 @@ export default function BotchatDashboard({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [isHighReasoning, setIsHighReasoning] = useState(false);
+  const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false);
   const [messageTimestamps, setMessageTimestamps] = useState<
     Record<string, string>
   >(() => initialData.messageTimestamps);
@@ -474,6 +475,7 @@ export default function BotchatDashboard({
     const sessionIdAtSend = activeSessionId;
     const expertIdAtSend = activeExpertId;
     const reasoningEffortAtSend = getReasoningEffortFromToggle(isHighReasoning);
+    const webSearchAtSend = isWebSearchEnabled;
     const abort = new AbortController();
 
     setInput("");
@@ -535,6 +537,7 @@ export default function BotchatDashboard({
                 sessionId: sessionIdAtSend,
                 expertId: expertIdAtSend,
                 reasoningEffort: reasoningEffortAtSend,
+                webSearch: webSearchAtSend,
               },
             }
           );
@@ -546,6 +549,7 @@ export default function BotchatDashboard({
                 sessionId: sessionIdAtSend,
                 expertId: expertIdAtSend,
                 reasoningEffort: reasoningEffortAtSend,
+                webSearch: webSearchAtSend,
               },
             }
           );
@@ -595,7 +599,9 @@ export default function BotchatDashboard({
         input={input}
         setInput={setInput}
         isHighReasoning={isHighReasoning}
+        isWebSearchEnabled={isWebSearchEnabled}
         onToggleReasoning={() => setIsHighReasoning((value) => !value)}
+        onToggleWebSearch={() => setIsWebSearchEnabled((value) => !value)}
         onSubmit={onSubmit}
         onCreateSessionForExpert={handleCreateSessionForExpert}
         pendingFiles={pendingFiles}

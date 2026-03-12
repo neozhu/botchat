@@ -89,6 +89,7 @@ export async function POST(request: Request) {
   const sessionId: string | undefined = body?.sessionId;
   const expertId: string | undefined = body?.expertId;
   const reasoningEffort = normalizeReasoningEffort(body?.reasoningEffort);
+  const isWebSearchEnabled = body?.webSearch === true;
 
   if (!Array.isArray(messages)) {
     return new Response(
@@ -151,6 +152,11 @@ export async function POST(request: Request) {
         inputSchema: z.object({}),
         execute: async () => getCurrentSystemDateTime(),
       }),
+      ...(isWebSearchEnabled
+        ? {
+            web_search: openai.tools.webSearch(),
+          }
+        : {}),
     },
     toolChoice: shouldUseCurrentSystemDateTimeTool
       ? { type: "tool", toolName: "getCurrentSystemDateTime" }

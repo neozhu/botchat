@@ -65,16 +65,27 @@ export function AuthForm() {
   const [selectedMode, setSelectedMode] = useState<"sign-in" | "sign-up">(
     "sign-in"
   );
+  const [checkEmailDismissed, setCheckEmailDismissed] = useState(false);
   const [signInState, signInFormAction] = useActionState(signInAction, {
     ...initialAuthActionState,
   });
   const [signUpState, signUpFormAction] = useActionState(signUpAction, {
     ...initialAuthActionState,
   });
-  const currentScreen = getAuthScreen(selectedMode, signUpState);
+  const currentScreen = getAuthScreen(
+    selectedMode,
+    signUpState,
+    checkEmailDismissed
+  );
 
-  const changeMode = (mode: Exclude<AuthScreenMode, "check-email">) => {
+  const changeMode = (
+    mode: Exclude<AuthScreenMode, "check-email">,
+    options?: { dismissCheckEmail?: boolean }
+  ) => {
     setSelectedMode(mode);
+    if (options?.dismissCheckEmail) {
+      setCheckEmailDismissed(true);
+    }
   };
 
   return (
@@ -174,7 +185,13 @@ export function AuthForm() {
         ) : null}
 
         {currentScreen === "sign-up" ? (
-          <form action={signUpFormAction} className="space-y-4">
+          <form
+            action={(formData) => {
+              setCheckEmailDismissed(false);
+              signUpFormAction(formData);
+            }}
+            className="space-y-4"
+          >
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="sign-up-email">
                 Email
@@ -242,7 +259,7 @@ export function AuthForm() {
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button"
-                onClick={() => changeMode("sign-in")}
+                onClick={() => changeMode("sign-in", { dismissCheckEmail: true })}
                 className="rounded-full"
               >
                 Back to sign in
@@ -250,7 +267,7 @@ export function AuthForm() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => changeMode("sign-up")}
+                onClick={() => changeMode("sign-up", { dismissCheckEmail: true })}
                 className="rounded-full"
               >
                 <ArrowLeft className="h-4 w-4" />

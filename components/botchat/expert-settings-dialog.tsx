@@ -1,6 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type RefCallback,
+} from "react";
+import { createPortal } from "react-dom";
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import {
   getExpertListIntroTimeoutMs,
@@ -9,6 +36,10 @@ import {
   getDuplicateExpertNameError,
   resolveSelectedExpertId,
 } from "@/lib/botchat/expert-settings";
+import {
+  getExpertDragOverlayStyle,
+  getExpertListDropResult,
+} from "@/lib/botchat/expert-list-sortable";
 import type { ExpertRow } from "@/lib/botchat/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -87,6 +118,139 @@ function defaultDraft(): ExpertDraft {
   };
 }
 
+function ExpertListRowContent({
+  expert,
+  isActive,
+  canReorder,
+  isAnimatingListIntro,
+  index,
+  onSelect,
+  dragHandleProps,
+  isDragging = false,
+  isOverlay = false,
+}: {
+  expert: ExpertRow;
+  isActive: boolean;
+  canReorder: boolean;
+  isAnimatingListIntro: boolean;
+  index: number;
+  onSelect: (expertId: string) => void;
+  dragHandleProps?: ButtonHTMLAttributes<HTMLButtonElement> & {
+    ref?: RefCallback<HTMLButtonElement>;
+  };
+  isDragging?: boolean;
+  isOverlay?: boolean;
+}) {
+  const introStyle = getExpertRowIntroStyle(index, isAnimatingListIntro && !isOverlay);
+
+  return (
+    <div
+      data-expert-row
+      data-expert-id={expert.id}
+      data-selected={isActive ? "true" : "false"}
+      style={isOverlay ? undefined : introStyle}
+      className={cn(
+        "group flex w-full items-stretch gap-1 rounded-2xl border p-1 transition",
+        isAnimatingListIntro &&
+          !isOverlay &&
+          "motion-safe:animate-expert-list-intro motion-reduce:animate-none",
+        isActive
+          ? "border-[var(--accent-line)]/55 bg-[color-mix(in_oklab,var(--accent-line)_9%,white)] shadow-[0_18px_44px_-28px_rgba(32,24,70,0.55)] ring-1 ring-[var(--accent-line)]/25"
+          : "border-black/10 bg-white/60 hover:bg-white",
+        isDragging && !isOverlay && "opacity-35",
+        isOverlay && "bg-white shadow-[0_30px_80px_-40px_rgba(20,20,60,0.6)]"
+      )}
+      >
+      <button
+        type="button"
+        aria-label={
+          canReorder
+            ? "Drag to reorder"
+            : "Reordering disabled"
+        }
+        title={
+          canReorder
+            ? "Drag to reorder"
+            : "Reordering disabled"
+        }
+        disabled={!canReorder}
+        {...dragHandleProps}
+        className={cn(
+          "grid h-10 w-9 touch-none place-items-center rounded-xl border border-transparent text-muted-foreground transition",
+          canReorder
+            ? "cursor-grab hover:bg-black/5 hover:text-foreground active:cursor-grabbing"
+            : "cursor-not-allowed opacity-40",
+          isOverlay && "cursor-grabbing"
+        )}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onSelect(expert.id)}
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-1 text-left transition",
+          isActive && "text-foreground"
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-semibold">{expert.name}</p>
+          <p
+            className={cn(
+              "truncate text-[11px] text-muted-foreground",
+              isActive && "text-foreground/70"
+            )}
+          >
+            {expert.agent_name} · {expert.slug ?? ""}
+          </p>
+        </div>
+        <ChevronRight
+          className={cn(
+            "h-4 w-4 opacity-60 transition group-hover:opacity-90",
+            isActive && "translate-x-0.5 opacity-100 text-[var(--accent-line)]"
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
+function SortableExpertListRow(props: Omit<Parameters<typeof ExpertListRowContent>[0], "dragHandleProps" | "isDragging" | "isOverlay">) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: props.expert.id,
+    disabled: !props.canReorder,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+    >
+      <ExpertListRowContent
+        {...props}
+        isDragging={isDragging}
+        dragHandleProps={{
+          ref: setActivatorNodeRef,
+          ...attributes,
+          ...listeners,
+        }}
+      />
+    </div>
+  );
+}
+
 export type ExpertSettingsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -109,15 +273,23 @@ export function ExpertSettingsDialog({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ExpertDraft>(() => defaultDraft());
   const [copied, setCopied] = useState<null | "system_prompt" | "suggestion_question">(null);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
+  const [isClient, setIsClient] = useState(false);
   const [isAnimatingListIntro, setIsAnimatingListIntro] = useState(false);
   const wasDirtyRef = useRef(false);
   const lastSyncedSelectedIdRef = useRef<string | null>(null);
   const expertsRef = useRef<ExpertRow[]>([]);
-  const draggingIdRef = useRef<string | null>(null);
-  const dragStartOrderRef = useRef<string[] | null>(null);
   const preserveEmptySelectionRef = useRef(false);
   const introAnimationTimeoutRef = useRef<number | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -172,6 +344,21 @@ export function ExpertSettingsDialog({
     expertsRef.current = experts;
   }, [experts]);
 
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const updateExperts = useCallback(
+    (value: ExpertRow[] | ((prev: ExpertRow[]) => ExpertRow[])) => {
+      setExperts((prev) => {
+        const next = typeof value === "function" ? value(prev) : value;
+        expertsRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
+
   const stopListIntroAnimation = useCallback(() => {
     if (introAnimationTimeoutRef.current !== null) {
       window.clearTimeout(introAnimationTimeoutRef.current);
@@ -196,7 +383,7 @@ export function ExpertSettingsDialog({
 
     const payload = (await response.json()) as { experts?: ExpertRow[] };
     const rows = Array.isArray(payload.experts) ? payload.experts : [];
-    setExperts(rows);
+    updateExperts(rows);
     setSelectedId((current) =>
       resolveSelectedExpertId(rows, current, {
         preserveEmptySelection: preserveEmptySelectionRef.current,
@@ -212,40 +399,46 @@ export function ExpertSettingsDialog({
     }
     onExpertsUpdated?.(rows);
     setIsLoading(false);
-  }, [onExpertsUpdated, stopListIntroAnimation]);
+  }, [onExpertsUpdated, stopListIntroAnimation, updateExperts]);
 
   const persistExpertOrder = useCallback(
     async (nextExperts: ExpertRow[]) => {
       setIsReordering(true);
       setError(null);
 
-      const response = await fetch("/api/experts/reorder", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          items: nextExperts.map((expert) => ({
-            id: expert.id,
-            sort_order: expert.sort_order,
-          })),
-        }),
-      });
+      try {
+        const response = await fetch("/api/experts/reorder", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            items: nextExperts.map((expert) => ({
+              id: expert.id,
+              sort_order: expert.sort_order,
+            })),
+          }),
+        });
 
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-        setError(body?.error || "Failed to reorder experts.");
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          setError(body?.error || "Failed to reorder experts.");
+          return false;
+        }
+
+        const payload = (await response.json()) as { experts?: ExpertRow[] };
+        const rows = Array.isArray(payload.experts) ? payload.experts : nextExperts;
+        updateExperts(rows);
+        onExpertsUpdated?.(rows);
+        return true;
+      } catch (error) {
+        setError(error instanceof Error ? error.message : "Failed to reorder experts.");
+        return false;
+      } finally {
         setIsReordering(false);
-        return;
       }
-
-      const payload = (await response.json()) as { experts?: ExpertRow[] };
-      const rows = Array.isArray(payload.experts) ? payload.experts : nextExperts;
-      setExperts(rows);
-      onExpertsUpdated?.(rows);
-      setIsReordering(false);
     },
-    [onExpertsUpdated]
+    [onExpertsUpdated, updateExperts]
   );
 
   useEffect(() => {
@@ -365,7 +558,7 @@ export function ExpertSettingsDialog({
 
       const result = (await response.json()) as { experts?: ExpertRow[] };
       const nextExperts = Array.isArray(result.experts) ? result.experts : [];
-      setExperts(nextExperts);
+      updateExperts(nextExperts);
       onExpertsUpdated?.(nextExperts);
 
       const refreshedSelection =
@@ -432,7 +625,7 @@ export function ExpertSettingsDialog({
       }
       const result = (await response.json()) as { experts?: ExpertRow[] };
       const nextExperts = Array.isArray(result.experts) ? result.experts : [];
-      setExperts(nextExperts);
+      updateExperts(nextExperts);
       onExpertsUpdated?.(nextExperts);
       preserveEmptySelectionRef.current = true;
       setSelectedId(null);
@@ -506,6 +699,56 @@ export function ExpertSettingsDialog({
     !isDeleting &&
     !isGenerating &&
     !isReordering;
+  const activeDragExpert = activeDragId
+    ? experts.find((expert) => expert.id === activeDragId) ?? null
+    : null;
+
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveDragId(String(active.id));
+    setActiveDragWidth(active.rect.current.initial?.width ?? null);
+  };
+
+  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
+    setActiveDragId(null);
+    setActiveDragWidth(null);
+
+    const activeId = String(active.id);
+    const overId = over ? String(over.id) : null;
+    const dropResult = getExpertListDropResult({
+      experts: expertsRef.current,
+      activeId,
+      overId,
+      selectedExpertId: draft.id && selectedId === draft.id ? draft.id : selectedId,
+    });
+
+    if (!dropResult) return;
+
+    const previousExperts = expertsRef.current;
+    updateExperts(dropResult.experts);
+
+    if (dropResult.selectedExpertSortOrder !== null && draft.id && selectedId === draft.id) {
+      setDraft((prev) => ({
+        ...prev,
+        sort_order: dropResult.selectedExpertSortOrder ?? prev.sort_order,
+      }));
+    }
+
+    const didPersist = await persistExpertOrder(dropResult.experts);
+    if (!didPersist) {
+      updateExperts(previousExperts);
+      if (draft.id && selectedId === draft.id) {
+        const previousSelected = previousExperts.find((expert) => expert.id === draft.id) ?? null;
+        if (previousSelected) {
+          setDraft((prev) => ({ ...prev, sort_order: previousSelected.sort_order }));
+        }
+      }
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveDragId(null);
+    setActiveDragWidth(null);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -556,168 +799,68 @@ export function ExpertSettingsDialog({
 
             <Separator className="my-4 bg-black/10" />
 
-             <ScrollArea className="h-[52vh] pr-2 md:h-[64vh]">
-               <div className="space-y-2">
-                 {isLoading ? (
-                   Array.from({ length: 3 }).map((_, i) => (
-                     <div
-                      key={`expert-skeleton-${i}`}
-                      className="h-12 rounded-xl border border-black/10 bg-white/60"
-                    />
-                  ))
-                ) : filtered.length === 0 ? (
-                  <div className="rounded-xl border border-black/10 bg-white/60 p-3 text-xs text-muted-foreground">
-                    No experts found.
-                  </div>
-                ) : (
-                  filtered.map((expert, index) => {
-                    const isActive = expert.id === selectedId;
-                    const isDragging = draggingId === expert.id;
-                    const introStyle = getExpertRowIntroStyle(index, isAnimatingListIntro);
-                    return (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={(event) => void handleDragEnd(event)}
+              onDragCancel={handleDragCancel}
+            >
+              <ScrollArea className="h-[52vh] pr-2 md:h-[64vh]">
+                <div className="space-y-2">
+                  {isLoading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
                       <div
-                        key={expert.id}
-                        data-expert-row
-                        data-expert-id={expert.id}
-                        data-selected={isActive ? "true" : "false"}
-                        style={introStyle}
-                        className={cn(
-                          "group flex w-full items-stretch gap-1 rounded-2xl border p-1 transition",
-                          isAnimatingListIntro &&
-                            "motion-safe:animate-expert-list-intro motion-reduce:animate-none",
-                          isActive
-                            ? "border-[var(--accent-line)]/55 bg-[color-mix(in_oklab,var(--accent-line)_9%,white)] shadow-[0_18px_44px_-28px_rgba(32,24,70,0.55)] ring-1 ring-[var(--accent-line)]/25"
-                            : "border-black/10 bg-white/60 hover:bg-white",
-                          isDragging && "opacity-70"
-                        )}
-                      >
-                        <button
-                          type="button"
-                          aria-label={
+                        key={`expert-skeleton-${i}`}
+                        className="h-12 rounded-xl border border-black/10 bg-white/60"
+                      />
+                    ))
+                  ) : filtered.length === 0 ? (
+                    <div className="rounded-xl border border-black/10 bg-white/60 p-3 text-xs text-muted-foreground">
+                      No experts found.
+                    </div>
+                  ) : (
+                    <SortableContext
+                      items={filtered.map((expert) => expert.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {filtered.map((expert, index) => (
+                        <SortableExpertListRow
+                          key={expert.id}
+                          expert={expert}
+                          isActive={expert.id === selectedId}
+                          canReorder={canReorder}
+                          isAnimatingListIntro={isAnimatingListIntro}
+                          index={index}
+                          onSelect={selectExpert}
+                        />
+                      ))}
+                    </SortableContext>
+                  )}
+                </div>
+              </ScrollArea>
+
+              {isClient
+                ? createPortal(
+                    <DragOverlay>
+                      {activeDragExpert ? (
+                        <div style={getExpertDragOverlayStyle(activeDragWidth)}>
+                          <ExpertListRowContent
+                            expert={activeDragExpert}
+                            isActive={activeDragExpert.id === selectedId}
                             canReorder
-                              ? "Drag to reorder"
-                              : query.trim()
-                                ? "Clear search to reorder"
-                                : "Reordering disabled"
-                          }
-                          title={
-                            canReorder
-                              ? "Drag to reorder"
-                              : query.trim()
-                                ? "Clear search to reorder"
-                                : "Reordering disabled"
-                          }
-                          disabled={!canReorder}
-                          onPointerDown={(event) => {
-                            if (!canReorder) return;
-                            draggingIdRef.current = expert.id;
-                            dragStartOrderRef.current = expertsRef.current.map((e) => e.id);
-                            setDraggingId(expert.id);
-                            event.currentTarget.setPointerCapture(event.pointerId);
-                            event.preventDefault();
-                            event.stopPropagation();
-                          }}
-                          onPointerMove={(event) => {
-                            const draggingId = draggingIdRef.current;
-                            if (!canReorder || !draggingId) return;
-
-                            const element = document.elementFromPoint(
-                              event.clientX,
-                              event.clientY
-                            );
-                            const row = element?.closest?.(
-                              "[data-expert-row]"
-                            ) as HTMLElement | null;
-                            const overId = row?.dataset?.expertId ?? null;
-                            if (!overId || overId === draggingId) return;
-
-                            setExperts((prev) => {
-                              const fromIndex = prev.findIndex((e) => e.id === draggingId);
-                              const toIndex = prev.findIndex((e) => e.id === overId);
-                              if (fromIndex < 0 || toIndex < 0) return prev;
-                              return normalizeExpertOrder(moveArrayItem(prev, fromIndex, toIndex));
-                            });
-                          }}
-                          onPointerUp={(event) => {
-                            const startOrder = dragStartOrderRef.current;
-                            const draggingId = draggingIdRef.current;
-                            dragStartOrderRef.current = null;
-                            draggingIdRef.current = null;
-                            setDraggingId(null);
-
-                            if (!draggingId) return;
-                            try {
-                              event.currentTarget.releasePointerCapture(event.pointerId);
-                            } catch {
-                              // Ignore.
-                            }
-
-                            if (!startOrder) return;
-
-                            const currentExperts = expertsRef.current;
-                            const nextOrder = currentExperts.map((e) => e.id);
-                            const hasChanged =
-                              startOrder.length === nextOrder.length &&
-                              startOrder.some((id, index) => id !== nextOrder[index]);
-                            if (!hasChanged) return;
-
-                            const normalized = normalizeExpertOrder(currentExperts);
-                            setExperts(normalized);
-                            if (draft.id && selectedId === draft.id) {
-                              const nextSelected = normalized.find((e) => e.id === draft.id) ?? null;
-                              if (nextSelected) {
-                                setDraft((prev) => ({ ...prev, sort_order: nextSelected.sort_order }));
-                              }
-                            }
-                            void persistExpertOrder(normalized);
-                          }}
-                          onPointerCancel={() => {
-                            dragStartOrderRef.current = null;
-                            draggingIdRef.current = null;
-                            setDraggingId(null);
-                          }}
-                          className={cn(
-                            "grid h-10 w-9 place-items-center rounded-xl border border-transparent text-muted-foreground transition",
-                            canReorder
-                              ? "cursor-grab hover:bg-black/5 hover:text-foreground active:cursor-grabbing"
-                              : "cursor-not-allowed opacity-40"
-                          )}
-                        >
-                          <GripVertical className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => selectExpert(expert.id)}
-                          className={cn(
-                            "flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-1 text-left transition",
-                            isActive && "text-foreground"
-                          )}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-semibold">{expert.name}</p>
-                            <p
-                              className={cn(
-                                "truncate text-[11px] text-muted-foreground",
-                                isActive && "text-foreground/70"
-                              )}
-                            >
-                              {expert.agent_name} · {expert.slug ?? ""}
-                            </p>
-                          </div>
-                          <ChevronRight
-                            className={cn(
-                              "h-4 w-4 opacity-60 transition group-hover:opacity-90",
-                              isActive && "translate-x-0.5 opacity-100 text-[var(--accent-line)]"
-                            )}
+                            isAnimatingListIntro={false}
+                            index={0}
+                            onSelect={selectExpert}
+                            isOverlay
                           />
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </ScrollArea>
+                        </div>
+                      ) : null}
+                    </DragOverlay>,
+                    document.body
+                  )
+                : null}
+            </DndContext>
           </div>
 
           <div className="p-5 pr-14 md:p-6 md:pr-16">

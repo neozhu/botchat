@@ -35,15 +35,6 @@ export function resolveSelectedExpertId(
   return experts[0]?.id ?? null;
 }
 
-export function getExpertRowIntroStyle(index: number, enabled: boolean) {
-  if (!enabled) return undefined;
-
-  return {
-    animationDelay: `${Math.max(0, index) * EXPERT_ROW_INTRO_STAGGER_MS}ms`,
-    animationDuration: `${EXPERT_ROW_INTRO_DURATION_MS}ms`,
-  } as const;
-}
-
 export function getExpertListIntroTimeoutMs(rowCount: number) {
   if (rowCount <= 0) return 0;
 

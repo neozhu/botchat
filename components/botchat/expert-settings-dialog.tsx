@@ -9,6 +9,7 @@ import {
   type ButtonHTMLAttributes,
   type RefCallback,
 } from "react";
+import { motion, useReducedMotion, type Variants } from "motion/react";
 import { createPortal } from "react-dom";
 import {
   closestCenter,
@@ -32,7 +33,6 @@ import { cn } from "@/lib/utils";
 import {
   getExpertListIntroTimeoutMs,
   formatExpertSaveError,
-  getExpertRowIntroStyle,
   getDuplicateExpertNameError,
   resolveSelectedExpertId,
 } from "@/lib/botchat/expert-settings";
@@ -83,6 +83,24 @@ const expertGenerationSchema = z.object({
   suggestion_question: z.string().min(1),
 });
 
+const expertListRowIntroVariants: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    filter: "blur(6px)",
+  },
+  visible: (index: number) => ({
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: {
+      delay: index * 0.08,
+      duration: 0.42,
+      ease: [0.16, 1, 0.3, 1],
+    },
+  }),
+};
+
 function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number) {
   if (fromIndex === toIndex) return items;
   const next = items.slice();
@@ -122,8 +140,6 @@ function ExpertListRowContent({
   expert,
   isActive,
   canReorder,
-  isAnimatingListIntro,
-  index,
   onSelect,
   dragHandleProps,
   isDragging = false,
@@ -132,8 +148,6 @@ function ExpertListRowContent({
   expert: ExpertRow;
   isActive: boolean;
   canReorder: boolean;
-  isAnimatingListIntro: boolean;
-  index: number;
   onSelect: (expertId: string) => void;
   dragHandleProps?: ButtonHTMLAttributes<HTMLButtonElement> & {
     ref?: RefCallback<HTMLButtonElement>;
@@ -141,19 +155,13 @@ function ExpertListRowContent({
   isDragging?: boolean;
   isOverlay?: boolean;
 }) {
-  const introStyle = getExpertRowIntroStyle(index, isAnimatingListIntro && !isOverlay);
-
   return (
     <div
       data-expert-row
       data-expert-id={expert.id}
       data-selected={isActive ? "true" : "false"}
-      style={isOverlay ? undefined : introStyle}
       className={cn(
         "group flex w-full items-stretch gap-1 rounded-2xl border p-1 transition",
-        isAnimatingListIntro &&
-          !isOverlay &&
-          "motion-safe:animate-expert-list-intro motion-reduce:animate-none",
         isActive
           ? "border-[var(--accent-line)]/55 bg-[color-mix(in_oklab,var(--accent-line)_9%,white)] shadow-[0_18px_44px_-28px_rgba(32,24,70,0.55)] ring-1 ring-[var(--accent-line)]/25"
           : "border-black/10 bg-white/60 hover:bg-white",
@@ -216,7 +224,15 @@ function ExpertListRowContent({
   );
 }
 
-function SortableExpertListRow(props: Omit<Parameters<typeof ExpertListRowContent>[0], "dragHandleProps" | "isDragging" | "isOverlay">) {
+function SortableExpertListRow(
+  props: Omit<
+    Parameters<typeof ExpertListRowContent>[0],
+    "dragHandleProps" | "isDragging" | "isOverlay"
+  > & {
+    isAnimatingListIntro: boolean;
+    index: number;
+  }
+) {
   const {
     attributes,
     listeners,
@@ -229,6 +245,9 @@ function SortableExpertListRow(props: Omit<Parameters<typeof ExpertListRowConten
     id: props.expert.id,
     disabled: !props.canReorder,
   });
+  const prefersReducedMotion = useReducedMotion();
+  const shouldAnimateIntro =
+    props.isAnimatingListIntro && !isDragging && !prefersReducedMotion;
 
   return (
     <div
@@ -238,15 +257,22 @@ function SortableExpertListRow(props: Omit<Parameters<typeof ExpertListRowConten
         transition,
       }}
     >
-      <ExpertListRowContent
-        {...props}
-        isDragging={isDragging}
-        dragHandleProps={{
-          ref: setActivatorNodeRef,
-          ...attributes,
-          ...listeners,
-        }}
-      />
+      <motion.div
+        custom={props.index}
+        variants={expertListRowIntroVariants}
+        initial={shouldAnimateIntro ? "hidden" : false}
+        animate="visible"
+      >
+        <ExpertListRowContent
+          {...props}
+          isDragging={isDragging}
+          dragHandleProps={{
+            ref: setActivatorNodeRef,
+            ...attributes,
+            ...listeners,
+          }}
+        />
+      </motion.div>
     </div>
   );
 }
@@ -280,6 +306,7 @@ export function ExpertSettingsDialog({
   const wasDirtyRef = useRef(false);
   const lastSyncedSelectedIdRef = useRef<string | null>(null);
   const expertsRef = useRef<ExpertRow[]>([]);
+  const hasPlayedListIntroRef = useRef(false);
   const preserveEmptySelectionRef = useRef(false);
   const introAnimationTimeoutRef = useRef<number | null>(null);
   const sensors = useSensors(
@@ -389,8 +416,10 @@ export function ExpertSettingsDialog({
         preserveEmptySelection: preserveEmptySelectionRef.current,
       })
     );
+    const shouldAnimateListIntro = rows.length > 0 && !hasPlayedListIntroRef.current;
     stopListIntroAnimation();
-    if (rows.length > 0) {
+    if (shouldAnimateListIntro) {
+      hasPlayedListIntroRef.current = true;
       setIsAnimatingListIntro(true);
       introAnimationTimeoutRef.current = window.setTimeout(() => {
         setIsAnimatingListIntro(false);
@@ -450,6 +479,7 @@ export function ExpertSettingsDialog({
     if (open) return;
     preserveEmptySelectionRef.current = false;
     lastSyncedSelectedIdRef.current = null;
+    hasPlayedListIntroRef.current = false;
     stopListIntroAnimation();
   }, [open, stopListIntroAnimation]);
 
@@ -849,8 +879,6 @@ export function ExpertSettingsDialog({
                             expert={activeDragExpert}
                             isActive={activeDragExpert.id === selectedId}
                             canReorder
-                            isAnimatingListIntro={false}
-                            index={0}
                             onSelect={selectExpert}
                             isOverlay
                           />
@@ -911,10 +939,10 @@ export function ExpertSettingsDialog({
               </div>
             ) : null}
 
-            <div className="mt-5 grid gap-4">
-              <Card className="rounded-3xl border-black/10 bg-white/70 p-4 shadow-none">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="space-y-1.5">
+            <div className="mt-5 grid gap-3">
+              <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-3.5 shadow-none">
+                <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+                  <div className="space-y-1">
                     <p className="text-[11px] font-medium text-muted-foreground">Name</p>
                     <Input
                       value={draft.name}
@@ -931,7 +959,7 @@ export function ExpertSettingsDialog({
                       className="bg-white"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <p className="text-[11px] font-medium text-muted-foreground">Agent name</p>
                     <Input
                       value={draft.agent_name}
@@ -942,7 +970,7 @@ export function ExpertSettingsDialog({
                   </div>
                 </div>
 
-                <div className="mt-3 space-y-1.5">
+                <div className="mt-2.5 space-y-1">
                   <p className="text-[11px] font-medium text-muted-foreground">Description</p>
                   <Textarea
                     value={draft.description}
@@ -953,8 +981,8 @@ export function ExpertSettingsDialog({
                 </div>
               </Card>
 
-              <Card className="rounded-3xl border-black/10 bg-white/70 p-4 shadow-none">
-                <div className="flex items-center justify-between gap-3">
+              <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-4 shadow-none">
+                <div className="flex items-center justify-between gap-2.5">
                   <div>
                     <p className="text-[11px] font-medium text-muted-foreground">System prompt</p>
                     <p className="text-[11px] text-muted-foreground">
@@ -977,12 +1005,12 @@ export function ExpertSettingsDialog({
                   value={draft.system_prompt}
                   onChange={(e) => setDraft((prev) => ({ ...prev, system_prompt: e.target.value }))}
                   placeholder="Write the system prompt…"
-                  className="mt-3 min-h-[180px] bg-white text-sm leading-relaxed"
+                  className="mt-2.5 min-h-[180px] bg-white text-sm leading-relaxed"
                 />
               </Card>
 
-              <Card className="rounded-3xl border-black/10 bg-white/70 p-4 shadow-none">
-                <div className="flex items-center justify-between gap-3">
+              <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-3.5 shadow-none">
+                <div className="flex items-center justify-between gap-2.5">
                   <div>
                     <p className="text-[11px] font-medium text-muted-foreground">Suggestion question</p>
                     <p className="text-[11px] text-muted-foreground">One starter question.</p>
@@ -1005,7 +1033,7 @@ export function ExpertSettingsDialog({
                     setDraft((prev) => ({ ...prev, suggestion_question: e.target.value }))
                   }
                   placeholder="e.g. Can you help me plan a trip…"
-                  className="mt-3 min-h-[84px] bg-white text-sm"
+                  className="mt-2.5 min-h-[84px] bg-white text-sm"
                 />
               </Card>
 

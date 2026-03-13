@@ -22,6 +22,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { ExpertSettingsDialog } from "@/components/botchat/expert-settings-dialog";
+import type { ExpertRow } from "@/lib/botchat/types";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -45,6 +46,7 @@ type SessionItem = {
 
 export type SessionsPanelProps = {
   isLoadingSessions: boolean;
+  experts: ExpertRow[];
   sessions: SessionItem[];
   activeSessionId: string | null;
   deletingSessionIds: Set<string>;
@@ -54,23 +56,12 @@ export type SessionsPanelProps = {
   onSelectSession: (session: SessionItem) => void | Promise<void>;
   onDeleteSession: (session: SessionItem) => void | Promise<void>;
   formatRelativeTime: (thenIso: string, nowMs: number) => string;
-  onExpertsUpdated?: (
-    experts: Array<{
-      id: string;
-      slug: string;
-      name: string;
-      agent_name: string;
-      description: string | null;
-      system_prompt: string;
-      suggestion_question: string | null;
-      sort_order: number;
-      created_at: string;
-    }>
-  ) => void;
+  onExpertsUpdated?: (experts: ExpertRow[]) => void;
 };
 
 export function SessionsPanel({
   isLoadingSessions,
+  experts,
   sessions,
   activeSessionId,
   deletingSessionIds,
@@ -282,6 +273,7 @@ export function SessionsPanel({
         <ExpertSettingsDialog
           open={expertDialogOpen}
           onOpenChange={setExpertDialogOpen}
+          experts={experts}
           onExpertsUpdated={onExpertsUpdated}
         />
         <ChangePasswordDialog

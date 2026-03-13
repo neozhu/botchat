@@ -574,6 +574,7 @@ export default function BotchatDashboard({
     >
       <SessionsPanel
         isLoadingSessions={isLoadingSessions}
+        experts={experts}
         sessions={sessions}
         activeSessionId={activeSessionId}
         deletingSessionIds={deletingSessionIds}

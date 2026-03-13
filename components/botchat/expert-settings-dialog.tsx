@@ -34,7 +34,7 @@ import {
   getExpertListIntroTimeoutMs,
   formatExpertSaveError,
   getDuplicateExpertNameError,
-  resolveSelectedExpertId,
+  resolveExpertDialogState,
 } from "@/lib/botchat/expert-settings";
 import {
   getExpertDragOverlayStyle,
@@ -100,19 +100,6 @@ const expertListRowIntroVariants: Variants = {
     },
   }),
 };
-
-function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number) {
-  if (fromIndex === toIndex) return items;
-  const next = items.slice();
-  const [moved] = next.splice(fromIndex, 1);
-  if (!moved) return items;
-  next.splice(toIndex, 0, moved);
-  return next;
-}
-
-function normalizeExpertOrder(rows: ExpertRow[]) {
-  return rows.map((row, index) => ({ ...row, sort_order: index }));
-}
 
 function slugify(value: string) {
   return value
@@ -280,15 +267,17 @@ function SortableExpertListRow(
 export type ExpertSettingsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  experts?: ExpertRow[];
   onExpertsUpdated?: (experts: ExpertRow[]) => void;
 };
 
 export function ExpertSettingsDialog({
   open,
   onOpenChange,
+  experts: providedExperts,
   onExpertsUpdated,
 }: ExpertSettingsDialogProps) {
-  const [experts, setExperts] = useState<ExpertRow[]>([]);
+  const [experts, setExperts] = useState<ExpertRow[]>(() => providedExperts ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -394,6 +383,33 @@ export function ExpertSettingsDialog({
     setIsAnimatingListIntro(false);
   }, []);
 
+  const syncExperts = useCallback(
+    (nextExperts?: ExpertRow[] | null) => {
+      const nextState = resolveExpertDialogState({
+        currentExperts: expertsRef.current,
+        providedExperts: nextExperts,
+        selectedId,
+        preserveEmptySelection: preserveEmptySelectionRef.current,
+      });
+
+      updateExperts(nextState.experts);
+      setSelectedId(nextState.selectedId);
+
+      const shouldAnimateListIntro =
+        nextState.experts.length > 0 && !hasPlayedListIntroRef.current;
+      stopListIntroAnimation();
+      if (shouldAnimateListIntro) {
+        hasPlayedListIntroRef.current = true;
+        setIsAnimatingListIntro(true);
+        introAnimationTimeoutRef.current = window.setTimeout(() => {
+          setIsAnimatingListIntro(false);
+          introAnimationTimeoutRef.current = null;
+        }, getExpertListIntroTimeoutMs(nextState.experts.length));
+      }
+    },
+    [selectedId, stopListIntroAnimation, updateExperts]
+  );
+
   const loadExperts = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -410,25 +426,10 @@ export function ExpertSettingsDialog({
 
     const payload = (await response.json()) as { experts?: ExpertRow[] };
     const rows = Array.isArray(payload.experts) ? payload.experts : [];
-    updateExperts(rows);
-    setSelectedId((current) =>
-      resolveSelectedExpertId(rows, current, {
-        preserveEmptySelection: preserveEmptySelectionRef.current,
-      })
-    );
-    const shouldAnimateListIntro = rows.length > 0 && !hasPlayedListIntroRef.current;
-    stopListIntroAnimation();
-    if (shouldAnimateListIntro) {
-      hasPlayedListIntroRef.current = true;
-      setIsAnimatingListIntro(true);
-      introAnimationTimeoutRef.current = window.setTimeout(() => {
-        setIsAnimatingListIntro(false);
-        introAnimationTimeoutRef.current = null;
-      }, getExpertListIntroTimeoutMs(rows.length));
-    }
+    syncExperts(rows);
     onExpertsUpdated?.(rows);
     setIsLoading(false);
-  }, [onExpertsUpdated, stopListIntroAnimation, updateExperts]);
+  }, [onExpertsUpdated, syncExperts]);
 
   const persistExpertOrder = useCallback(
     async (nextExperts: ExpertRow[]) => {
@@ -472,8 +473,14 @@ export function ExpertSettingsDialog({
 
   useEffect(() => {
     if (!open) return;
+    if (providedExperts !== undefined) {
+      setIsLoading(false);
+      setError(null);
+      syncExperts(providedExperts);
+      return;
+    }
     void loadExperts();
-  }, [loadExperts, open]);
+  }, [loadExperts, open, providedExperts, syncExperts]);
 
   useEffect(() => {
     if (open) return;

@@ -11,6 +11,13 @@ type ResolveSelectedExpertOptions = {
   preserveEmptySelection?: boolean;
 };
 
+type ResolveExpertDialogStateInput = {
+  currentExperts: ExpertRow[];
+  providedExperts?: ExpertRow[] | null;
+  selectedId: string | null;
+  preserveEmptySelection?: boolean;
+};
+
 const EXPERT_ROW_INTRO_STAGGER_MS = 80;
 const EXPERT_ROW_INTRO_DURATION_MS = 420;
 const EXPERT_LIST_INTRO_BUFFER_MS = 200;
@@ -43,6 +50,26 @@ export function getExpertListIntroTimeoutMs(rowCount: number) {
     EXPERT_ROW_INTRO_DURATION_MS +
     EXPERT_LIST_INTRO_BUFFER_MS
   );
+}
+
+export function getExpertRowIntroStyle(index: number, isAnimatingListIntro: boolean) {
+  if (!isAnimatingListIntro) return undefined;
+
+  return {
+    animationDelay: `${Math.max(0, index) * EXPERT_ROW_INTRO_STAGGER_MS}ms`,
+    animationDuration: `${EXPERT_ROW_INTRO_DURATION_MS}ms`,
+  };
+}
+
+export function resolveExpertDialogState(input: ResolveExpertDialogStateInput) {
+  const experts = input.providedExperts ?? input.currentExperts;
+
+  return {
+    experts,
+    selectedId: resolveSelectedExpertId(experts, input.selectedId, {
+      preserveEmptySelection: input.preserveEmptySelection,
+    }),
+  };
 }
 
 export function findExpertNameConflict(

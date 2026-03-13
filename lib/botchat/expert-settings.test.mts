@@ -4,6 +4,7 @@ import {
   getExpertListIntroTimeoutMs,
   getExpertRowIntroStyle,
   getDuplicateExpertNameError,
+  resolveExpertDialogState,
   resolveSelectedExpertId,
 } from "./expert-settings.ts";
 import type { ExpertRow } from "./types.ts";
@@ -51,6 +52,45 @@ test("resolveSelectedExpertId preserves the active expert when it still exists",
   ];
 
   assert.equal(resolveSelectedExpertId(experts, "expert-2"), "expert-2");
+});
+
+test("resolveExpertDialogState prefers externally provided experts when available", () => {
+  const currentExperts = [createExpert({ id: "local-expert", name: "Local Expert" })];
+  const providedExperts = [
+    createExpert({ id: "provided-1", name: "Travel Concierge", sort_order: 0 }),
+    createExpert({ id: "provided-2", name: "Career Coach", slug: "career-coach", sort_order: 1 }),
+  ];
+
+  assert.deepEqual(
+    resolveExpertDialogState({
+      currentExperts,
+      providedExperts,
+      selectedId: "local-expert",
+    }),
+    {
+      experts: providedExperts,
+      selectedId: "provided-1",
+    }
+  );
+});
+
+test("resolveExpertDialogState preserves an empty draft selection against provided experts", () => {
+  const providedExperts = [
+    createExpert({ id: "provided-1", name: "Travel Concierge", sort_order: 0 }),
+  ];
+
+  assert.deepEqual(
+    resolveExpertDialogState({
+      currentExperts: [],
+      providedExperts,
+      selectedId: null,
+      preserveEmptySelection: true,
+    }),
+    {
+      experts: providedExperts,
+      selectedId: null,
+    }
+  );
 });
 
 test("getExpertRowIntroStyle returns staggered animation timing for intro rows", () => {

@@ -176,10 +176,20 @@ create policy "authenticated delete owned session messages" on public.chat_messa
 -- Run after creating the bucket in Storage.
 drop policy if exists "anon read chat attachments" on storage.objects;
 drop policy if exists "anon upload chat attachments" on storage.objects;
+drop policy if exists "authenticated read chat attachments" on storage.objects;
+drop policy if exists "authenticated upload chat attachments" on storage.objects;
 create policy "anon read chat attachments" on storage.objects
   for select to anon
   using (bucket_id = 'chat-attachments');
 
 create policy "anon upload chat attachments" on storage.objects
   for insert to anon
+  with check (bucket_id = 'chat-attachments');
+
+create policy "authenticated read chat attachments" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'chat-attachments');
+
+create policy "authenticated upload chat attachments" on storage.objects
+  for insert to authenticated
   with check (bucket_id = 'chat-attachments');

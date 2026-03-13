@@ -1,7 +1,7 @@
 "use client";
 
 import type { UIMessage } from "ai";
-import type { FormEvent } from "react";
+import type { ClipboardEvent, FormEvent } from "react";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
@@ -25,6 +25,10 @@ import { SidebarInset } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getActiveExpertCardDetails } from "@/lib/botchat/active-expert-card";
+import {
+  normalizePastedImageFiles,
+  shouldPreventClipboardPasteDefault,
+} from "@/lib/botchat/chat-clipboard";
 import { formatTimelineDay, getTimelineDayKey } from "@/lib/botchat/chat-timeline";
 import {
   THINKING_BUBBLE_DOT_CLASSNAMES,
@@ -513,6 +517,34 @@ export function ChatPanel({
     textarea.style.overflowY = textarea.scrollHeight > 240 ? "auto" : "hidden";
   }, [input]);
 
+  const handleTextareaPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!canSend) return;
+
+    const clipboardItems = Array.from(event.clipboardData?.items ?? []);
+    if (clipboardItems.length === 0) return;
+
+    const pastedImageFiles = clipboardItems
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file instanceof File);
+
+    if (pastedImageFiles.length === 0) return;
+
+    const hasPastedText = clipboardItems.some((item) => item.kind === "string");
+    const normalizedFiles = normalizePastedImageFiles(pastedImageFiles);
+
+    setPendingFiles((prev) => [...prev, ...normalizedFiles]);
+
+    if (
+      shouldPreventClipboardPasteDefault({
+        hasPastedImages: true,
+        hasPastedText,
+      })
+    ) {
+      event.preventDefault();
+    }
+  };
+
   return (
     <SidebarInset className="h-dvh overflow-hidden p-3 lg:p-4">
       <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col">
@@ -717,6 +749,7 @@ export function ChatPanel({
                   rows={1}
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
+                  onPaste={handleTextareaPaste}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();

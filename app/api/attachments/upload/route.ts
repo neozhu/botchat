@@ -1,5 +1,5 @@
 import type { FileUIPart } from "ai";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabasePublicServerClient } from "@/lib/supabase/public-server";
 
 export const runtime = "nodejs";
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "No files provided." }, { status: 400 });
     }
 
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicServerClient();
     const uploaded: FileUIPart[] = [];
 
     for (const file of files) {

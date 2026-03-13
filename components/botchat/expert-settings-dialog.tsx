@@ -574,7 +574,6 @@ export function ExpertSettingsDialog({
                     const isActive = expert.id === selectedId;
                     const isDragging = draggingId === expert.id;
                     const introStyle = getExpertRowIntroStyle(index, isAnimatingListIntro);
-
                     return (
                       <div
                         key={expert.id}

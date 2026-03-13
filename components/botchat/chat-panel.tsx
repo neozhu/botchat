@@ -4,6 +4,7 @@ import type { UIMessage } from "ai";
 import type { FormEvent } from "react";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { AnimatePresence, motion } from "motion/react";
 import {
   Conversation,
   ConversationContent,
@@ -24,6 +25,12 @@ import { SidebarInset } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getActiveExpertCardDetails } from "@/lib/botchat/active-expert-card";
+import { formatTimelineDay, getTimelineDayKey } from "@/lib/botchat/chat-timeline";
+import {
+  THINKING_BUBBLE_DOT_CLASSNAMES,
+  THINKING_BUBBLE_TEXT,
+  getThinkingBubbleMotion,
+} from "@/lib/botchat/thinking-bubble";
 import { cn } from "@/lib/utils";
 import {
   Brain,
@@ -102,23 +109,6 @@ function messageText(message: UIMessage) {
   return (message as { content?: string }).content ?? "";
 }
 
-function dayKeyFromDate(date: Date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-function formatTimelineDay(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    weekday: "short",
-  }).format(date);
-}
-
 function DateSeparator({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 py-1 text-[11px] text-muted-foreground">
@@ -175,8 +165,7 @@ const MessageBubble = memo(function MessageBubble({
 }) {
   const text = messageText(message);
   const isUser = message.role === "user";
-  const isThinkingPlaceholder = message.id === "streaming";
-  const canCopyResponse = !isUser && !isThinkingPlaceholder && text.trim();
+  const canCopyResponse = !isUser && text.trim().length > 0;
   const [copied, setCopied] = useState(false);
   const resetCopyStateTimeoutRef = useRef<number | null>(null);
   const parts = (message as UIMessage).parts ?? [];
@@ -336,6 +325,52 @@ const MessageBubble = memo(function MessageBubble({
   );
 });
 
+function ThinkingBubble({ botInitials }: { botInitials: string }) {
+  const thinkingMotion = useMemo(() => getThinkingBubbleMotion(), []);
+
+  return (
+    <div className="flex items-end gap-3">
+      <Avatar className="h-9 w-9">
+        <AvatarFallback className="bg-[var(--accent-line)]/20 text-xs font-semibold text-[var(--accent-line)]">
+          {botInitials}
+        </AvatarFallback>
+      </Avatar>
+      <motion.div
+        initial={thinkingMotion.container.initial}
+        animate={thinkingMotion.container.animate}
+        exit={thinkingMotion.container.exit}
+        transition={thinkingMotion.container.transition}
+        className="relative flex max-w-[72%] min-w-0 flex-col"
+      >
+        <div
+          role="status"
+          aria-live="polite"
+          aria-label={THINKING_BUBBLE_TEXT}
+          className="flex min-h-[44px] items-center rounded-2xl bg-[linear-gradient(135deg,var(--bot-gradient-start),var(--bot-gradient-end))] px-4 py-2.5 text-sm leading-relaxed text-white shadow-[0_12px_30px_-20px_rgba(78,69,190,0.65)]"
+        >
+          <span className="sr-only">{THINKING_BUBBLE_TEXT}</span>
+          <motion.div
+            animate="jump"
+            transition={thinkingMotion.dotsTransition}
+            className="flex items-center gap-2"
+          >
+            {THINKING_BUBBLE_DOT_CLASSNAMES.map((className) => (
+              <motion.span
+                key={className}
+                variants={thinkingMotion.dotVariants}
+                className={cn(
+                  className,
+                  "block h-2 w-2 rounded-full bg-white/85 will-change-transform"
+                )}
+              />
+            ))}
+          </motion.div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export function ChatPanel({
   botName,
   botInitials,
@@ -423,7 +458,7 @@ export function ChatPanel({
         .map((message) => {
           if (!message.createdAt) return null;
           const date = new Date(message.createdAt);
-          return Number.isNaN(date.getTime()) ? null : dayKeyFromDate(date);
+          return Number.isNaN(date.getTime()) ? null : getTimelineDayKey(date);
         })
         .filter((value): value is string => Boolean(value))
     );
@@ -439,7 +474,7 @@ export function ChatPanel({
       if (message.createdAt) {
         const date = new Date(message.createdAt);
         if (!Number.isNaN(date.getTime())) {
-          currentDayKey = dayKeyFromDate(date);
+          currentDayKey = getTimelineDayKey(date);
           currentDayLabel = formatTimelineDay(date);
         }
       }
@@ -581,16 +616,11 @@ export function ChatPanel({
                   )
                 )}
 
-                {shouldShowThinking ? (
-                  <MessageBubble
-                    message={{
-                      id: "streaming",
-                      role: "assistant",
-                      parts: [{ type: "text", text: "Thinking..." }],
-                    }}
-                    botInitials={botInitials}
-                  />
-                ) : null}
+                <AnimatePresence initial={false}>
+                  {shouldShowThinking ? (
+                    <ThinkingBubble key="thinking" botInitials={botInitials} />
+                  ) : null}
+                </AnimatePresence>
               </ConversationContent>
               <ConversationScrollButton className="bottom-5" />
             </Conversation>

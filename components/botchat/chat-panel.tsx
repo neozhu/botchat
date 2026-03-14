@@ -1,7 +1,7 @@
 "use client";
 
 import type { UIMessage } from "ai";
-import type { ClipboardEvent, FormEvent } from "react";
+import type { ClipboardEvent, DragEvent, FormEvent } from "react";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getActiveExpertCardDetails } from "@/lib/botchat/active-expert-card";
 import {
-  normalizePastedImageFiles,
+  normalizeClipboardFiles,
   shouldPreventClipboardPasteDefault,
 } from "@/lib/botchat/chat-clipboard";
 import { formatTimelineDay, getTimelineDayKey } from "@/lib/botchat/chat-timeline";
@@ -401,6 +401,8 @@ export function ChatPanel({
   const activeExpertCard = getActiveExpertCardDetails(activeExpert);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const dragDepthRef = useRef(0);
+  const [isTextareaDragActive, setIsTextareaDragActive] = useState(false);
   const previews = useMemo(
     () =>
       pendingFiles.map((file) => ({
@@ -517,32 +519,88 @@ export function ChatPanel({
     textarea.style.overflowY = textarea.scrollHeight > 240 ? "auto" : "hidden";
   }, [input]);
 
+  const appendPendingFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    setPendingFiles((prev) => [...prev, ...files]);
+  };
+
+  const eventHasFiles = (types: Iterable<string>) => {
+    for (const type of types) {
+      if (type === "Files") return true;
+    }
+    return false;
+  };
+
   const handleTextareaPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     if (!canSend) return;
 
     const clipboardItems = Array.from(event.clipboardData?.items ?? []);
     if (clipboardItems.length === 0) return;
 
-    const pastedImageFiles = clipboardItems
-      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+    const pastedFiles = clipboardItems
+      .filter((item) => item.kind === "file")
       .map((item) => item.getAsFile())
       .filter((file): file is File => file instanceof File);
 
-    if (pastedImageFiles.length === 0) return;
+    if (pastedFiles.length === 0) return;
 
     const hasPastedText = clipboardItems.some((item) => item.kind === "string");
-    const normalizedFiles = normalizePastedImageFiles(pastedImageFiles);
+    const normalizedFiles = normalizeClipboardFiles(pastedFiles);
 
-    setPendingFiles((prev) => [...prev, ...normalizedFiles]);
+    appendPendingFiles(normalizedFiles);
 
     if (
       shouldPreventClipboardPasteDefault({
-        hasPastedImages: true,
+        hasPastedFiles: true,
         hasPastedText,
       })
     ) {
       event.preventDefault();
     }
+  };
+
+  const handleTextareaDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    if (!canSend || !eventHasFiles(event.dataTransfer.types)) return;
+
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setIsTextareaDragActive(true);
+  };
+
+  const handleTextareaDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!canSend || !eventHasFiles(event.dataTransfer.types)) return;
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+
+    if (!isTextareaDragActive) {
+      setIsTextareaDragActive(true);
+    }
+  };
+
+  const handleTextareaDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (!eventHasFiles(event.dataTransfer.types)) return;
+
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+
+    if (dragDepthRef.current === 0) {
+      setIsTextareaDragActive(false);
+    }
+  };
+
+  const handleTextareaDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!canSend || !eventHasFiles(event.dataTransfer.types)) return;
+
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setIsTextareaDragActive(false);
+
+    const files = Array.from(event.dataTransfer.files ?? []);
+    if (files.length === 0) return;
+
+    appendPendingFiles(files);
+    textareaRef.current?.focus();
   };
 
   return (
@@ -660,7 +718,16 @@ export function ChatPanel({
 
           <div className="px-6 pb-5">
             <form onSubmit={onSubmit} className="space-y-3">
-              <div className="rounded-[24px] border border-white/70 bg-white/80 p-3 shadow-[0_18px_40px_-30px_rgba(20,20,60,0.45)]">
+              <div
+                className={cn(
+                  "relative rounded-[24px] border border-white/70 bg-white/80 p-3 shadow-[0_18px_40px_-30px_rgba(20,20,60,0.45)] transition-colors",
+                  isTextareaDragActive && "bg-[var(--accent-line)]/6"
+                )}
+                onDragEnter={handleTextareaDragEnter}
+                onDragOver={handleTextareaDragOver}
+                onDragLeave={handleTextareaDragLeave}
+                onDrop={handleTextareaDrop}
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -669,10 +736,18 @@ export function ChatPanel({
                   onChange={(event) => {
                     const files = Array.from(event.target.files ?? []);
                     if (files.length === 0) return;
-                    setPendingFiles((prev) => [...prev, ...files]);
+                    appendPendingFiles(files);
                     event.currentTarget.value = "";
                   }}
                 />
+
+                {isTextareaDragActive ? (
+                  <div className="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-[20px] border-2 border-dashed border-[var(--accent-line)]/45 bg-[var(--accent-line)]/10">
+                    <div className="rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[var(--accent-line)] shadow-sm">
+                      Drop files anywhere in this box to attach
+                    </div>
+                  </div>
+                ) : null}
 
                 {pendingFiles.length > 0 ? (
                   <div className="mb-3 rounded-2xl border border-black/10 bg-white/60 p-2.5">
@@ -744,21 +819,33 @@ export function ChatPanel({
                   </div>
                 ) : null}
 
-                <Textarea
-                  ref={textareaRef}
-                  rows={1}
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onPaste={handleTextareaPaste}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      event.currentTarget.form?.requestSubmit();
+                <div
+                  className={cn(
+                    "rounded-[20px] transition-colors",
+                    isTextareaDragActive &&
+                      "bg-[var(--accent-line)]/8 ring-1 ring-[var(--accent-line)]/25"
+                  )}
+                >
+                  <Textarea
+                    ref={textareaRef}
+                    rows={1}
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onPaste={handleTextareaPaste}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
+                      }
+                    }}
+                    placeholder={
+                      isTextareaDragActive
+                        ? "Drop files here to attach"
+                        : "Type a message"
                     }
-                  }}
-                  placeholder="Type a message"
-                  className="max-h-60 min-h-0 resize-none overflow-y-hidden border-none bg-transparent p-0 text-sm leading-6 shadow-none focus-visible:ring-0"
-                />
+                    className="max-h-60 min-h-0 resize-none overflow-y-hidden border-none bg-transparent p-0 text-sm leading-6 shadow-none focus-visible:ring-0"
+                  />
+                </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <ToolbarIcon icon={MessageCircle} label="Message type" />

@@ -177,8 +177,29 @@ export async function saveExpert(input: SaveExpertInput) {
 
 export async function deleteExpertById(id: string) {
   const supabase = await createSupabaseServerClient();
+  const { data: linkedSessions, error: linkedSessionsError } = await supabase
+    .from("chat_sessions")
+    .select("id")
+    .eq("expert_id", id);
+
+  if (linkedSessionsError) throw new Error(linkedSessionsError.message);
+
+  const deletedSessionIds = (linkedSessions ?? [])
+    .map((session) => session.id)
+    .filter((sessionId): sessionId is string => typeof sessionId === "string");
+
+  if (deletedSessionIds.length > 0) {
+    const { error: deleteSessionsError } = await supabase
+      .from("chat_sessions")
+      .delete()
+      .eq("expert_id", id);
+
+    if (deleteSessionsError) throw new Error(deleteSessionsError.message);
+  }
+
   const { error } = await supabase.from("experts").delete().eq("id", id);
   if (error) throw new Error(error.message);
+  return { deletedSessionIds };
 }
 
 export async function persistExpertOrder(

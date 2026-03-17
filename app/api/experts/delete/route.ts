@@ -23,10 +23,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    await deleteExpertById(id);
+    const { deletedSessionIds } = await deleteExpertById(id);
     revalidateTag(BOTCHAT_EXPERTS_TAG, "max");
     const experts = await loadExperts();
-    return Response.json({ ok: true, experts });
+    return Response.json({ ok: true, experts, deletedSessionIds });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to delete expert.";

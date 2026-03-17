@@ -309,6 +309,60 @@ export default function BotchatDashboard({
     setPendingFiles([]);
   };
 
+  const handleExpertDeleted = async ({
+    expertId,
+    deletedSessionIds,
+    experts: nextExperts,
+  }: {
+    expertId: string;
+    deletedSessionIds: string[];
+    experts: ExpertRow[];
+  }) => {
+    const deletedSessionIdSet = new Set(deletedSessionIds);
+    const isActiveSessionDeleted =
+      activeSessionId !== null && deletedSessionIdSet.has(activeSessionId);
+
+    if (isActiveSessionDeleted) {
+      try {
+        inFlightAbortRef.current?.abort();
+        inFlightAbortRef.current = null;
+        setIsUploadingAttachments(false);
+        if (status !== "ready") await stop();
+      } catch {
+        // Best-effort abort; continue cleanup.
+      }
+    }
+
+    const remainingSessions = sessions.filter(
+      (session) => !deletedSessionIdSet.has(session.id)
+    );
+
+    setSessions(remainingSessions);
+
+    if (!isActiveSessionDeleted) {
+      if (!activeSessionId && activeExpertId === expertId) {
+        setActiveExpertId(nextExperts[0]?.id ?? null);
+      }
+      return;
+    }
+
+    const nextSession = remainingSessions[0] ?? null;
+
+    if (!nextSession) {
+      setActiveSessionId(null);
+      setActiveExpertId(nextExperts[0]?.id ?? null);
+      messagesSessionIdRef.current = null;
+      savedMessageIdsRef.current = new Set();
+      setMessages([]);
+      setMessageTimestamps({});
+      setInput("");
+      setPendingFiles([]);
+      return;
+    }
+
+    await handleSelectSession(nextSession);
+  };
+
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 30_000);
     return () => clearInterval(id);
@@ -585,6 +639,7 @@ export default function BotchatDashboard({
         onDeleteSession={handleDeleteSession}
         formatRelativeTime={formatRelativeTime}
         onExpertsUpdated={setExperts}
+        onExpertDeleted={handleExpertDeleted}
       />
       <ChatPanel
         botName={botName}

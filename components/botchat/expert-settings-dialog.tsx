@@ -48,6 +48,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -269,6 +270,11 @@ export type ExpertSettingsDialogProps = {
   onOpenChange: (open: boolean) => void;
   experts?: ExpertRow[];
   onExpertsUpdated?: (experts: ExpertRow[]) => void;
+  onExpertDeleted?: (payload: {
+    expertId: string;
+    deletedSessionIds: string[];
+    experts: ExpertRow[];
+  }) => void;
 };
 
 export function ExpertSettingsDialog({
@@ -276,6 +282,7 @@ export function ExpertSettingsDialog({
   onOpenChange,
   experts: providedExperts,
   onExpertsUpdated,
+  onExpertDeleted,
 }: ExpertSettingsDialogProps) {
   const [experts, setExperts] = useState<ExpertRow[]>(() => providedExperts ?? []);
   const [isLoading, setIsLoading] = useState(false);
@@ -292,6 +299,7 @@ export function ExpertSettingsDialog({
   const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [isAnimatingListIntro, setIsAnimatingListIntro] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const wasDirtyRef = useRef(false);
   const lastSyncedSelectedIdRef = useRef<string | null>(null);
   const expertsRef = useRef<ExpertRow[]>([]);
@@ -487,6 +495,7 @@ export function ExpertSettingsDialog({
     preserveEmptySelectionRef.current = false;
     lastSyncedSelectedIdRef.current = null;
     hasPlayedListIntroRef.current = false;
+    setDeleteConfirmOpen(false);
     stopListIntroAnimation();
   }, [open, stopListIntroAnimation]);
 
@@ -642,8 +651,6 @@ export function ExpertSettingsDialog({
 
   const removeSelected = async () => {
     if (!selected) return;
-    const ok = window.confirm(`Delete "${selected.name}"? This may fail if sessions reference it.`);
-    if (!ok) return;
 
     setIsDeleting(true);
     setError(null);
@@ -660,10 +667,22 @@ export function ExpertSettingsDialog({
           | null;
         throw new Error(body?.error || (await response.text()));
       }
-      const result = (await response.json()) as { experts?: ExpertRow[] };
+      const result = (await response.json()) as {
+        experts?: ExpertRow[];
+        deletedSessionIds?: string[];
+      };
       const nextExperts = Array.isArray(result.experts) ? result.experts : [];
+      const deletedSessionIds = Array.isArray(result.deletedSessionIds)
+        ? result.deletedSessionIds.filter((sessionId): sessionId is string => typeof sessionId === "string")
+        : [];
       updateExperts(nextExperts);
       onExpertsUpdated?.(nextExperts);
+      onExpertDeleted?.({
+        expertId: selected.id,
+        deletedSessionIds,
+        experts: nextExperts,
+      });
+      setDeleteConfirmOpen(false);
       preserveEmptySelectionRef.current = true;
       setSelectedId(null);
       setDraft(defaultDraft());
@@ -788,303 +807,345 @@ export function ExpertSettingsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="!w-[calc(100vw-2rem)] !max-w-[calc(100vw-2rem)] sm:!max-w-[min(100vw-2rem,1400px)] max-h-[92vh] overflow-auto border-white/60 bg-[var(--panel-strong)]/90 p-0 shadow-[0_40px_120px_-70px_rgba(20,20,60,0.75)] backdrop-blur"
-        showCloseButton
-      >
-        <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] xl:grid-cols-[420px_1fr]">
-          <div className="border-b border-white/30 bg-white/70 p-4 md:border-b-0 md:border-r">
-            <div className="flex items-start justify-between gap-3">
-              <DialogHeader className="text-left">
-                <DialogTitle className="font-[var(--font-display)] tracking-tight">
-                  Expert Studio
-                </DialogTitle>
-                <DialogDescription className="text-xs">
-                  Manage expert personas and prompts.
-                </DialogDescription>
-              </DialogHeader>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="rounded-full"
-                onClick={startNew}
-                aria-label="New expert"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="!w-[calc(100vw-2rem)] !max-w-[calc(100vw-2rem)] sm:!max-w-[min(100vw-2rem,1400px)] max-h-[92vh] overflow-auto border-white/60 bg-[var(--panel-strong)]/90 p-0 shadow-[0_40px_120px_-70px_rgba(20,20,60,0.75)] backdrop-blur"
+          showCloseButton
+        >
+          <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] xl:grid-cols-[420px_1fr]">
+            <div className="border-b border-white/30 bg-white/70 p-4 md:border-b-0 md:border-r">
+              <div className="flex items-start justify-between gap-3">
+                <DialogHeader className="text-left">
+                  <DialogTitle className="font-[var(--font-display)] tracking-tight">
+                    Expert Studio
+                  </DialogTitle>
+                  <DialogDescription className="text-xs">
+                    Manage expert personas and prompts.
+                  </DialogDescription>
+                </DialogHeader>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-full"
+                  onClick={startNew}
+                  aria-label="New expert"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
 
-             <div className="mt-4 flex items-center gap-2">
-               <Input
-                 value={query}
-                 onChange={(e) => setQuery(e.target.value)}
-                 placeholder="Search experts…"
-                 className="bg-white"
-               />
-               <Badge variant="secondary" className="shrink-0 rounded-full text-[10px]">
-                 {experts.length}
-               </Badge>
-               {isReordering ? (
-                 <Loader2
-                   className="h-4 w-4 animate-spin text-muted-foreground"
-                   aria-label="Saving order"
+               <div className="mt-4 flex items-center gap-2">
+                 <Input
+                   value={query}
+                   onChange={(e) => setQuery(e.target.value)}
+                   placeholder="Search experts…"
+                   className="bg-white"
                  />
-               ) : null}
-             </div>
+                 <Badge variant="secondary" className="shrink-0 rounded-full text-[10px]">
+                   {experts.length}
+                 </Badge>
+                 {isReordering ? (
+                   <Loader2
+                     className="h-4 w-4 animate-spin text-muted-foreground"
+                     aria-label="Saving order"
+                   />
+                 ) : null}
+               </div>
 
-            <Separator className="my-4 bg-black/10" />
+              <Separator className="my-4 bg-black/10" />
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={(event) => void handleDragEnd(event)}
-              onDragCancel={handleDragCancel}
-            >
-              <ScrollArea className="h-[52vh] pr-2 md:h-[64vh]">
-                <div className="space-y-2">
-                  {isLoading ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <div
-                        key={`expert-skeleton-${i}`}
-                        className="h-12 rounded-xl border border-black/10 bg-white/60"
-                      />
-                    ))
-                  ) : filtered.length === 0 ? (
-                    <div className="rounded-xl border border-black/10 bg-white/60 p-3 text-xs text-muted-foreground">
-                      No experts found.
-                    </div>
-                  ) : (
-                    <SortableContext
-                      items={filtered.map((expert) => expert.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {filtered.map((expert, index) => (
-                        <SortableExpertListRow
-                          key={expert.id}
-                          expert={expert}
-                          isActive={expert.id === selectedId}
-                          canReorder={canReorder}
-                          isAnimatingListIntro={isAnimatingListIntro}
-                          index={index}
-                          onSelect={selectExpert}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={(event) => void handleDragEnd(event)}
+                onDragCancel={handleDragCancel}
+              >
+                <ScrollArea className="h-[52vh] pr-2 md:h-[64vh]">
+                  <div className="space-y-2">
+                    {isLoading ? (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <div
+                          key={`expert-skeleton-${i}`}
+                          className="h-12 rounded-xl border border-black/10 bg-white/60"
                         />
-                      ))}
-                    </SortableContext>
-                  )}
-                </div>
-              </ScrollArea>
-
-              {isClient
-                ? createPortal(
-                    <DragOverlay>
-                      {activeDragExpert ? (
-                        <div style={getExpertDragOverlayStyle(activeDragWidth)}>
-                          <ExpertListRowContent
-                            expert={activeDragExpert}
-                            isActive={activeDragExpert.id === selectedId}
-                            canReorder
+                      ))
+                    ) : filtered.length === 0 ? (
+                      <div className="rounded-xl border border-black/10 bg-white/60 p-3 text-xs text-muted-foreground">
+                        No experts found.
+                      </div>
+                    ) : (
+                      <SortableContext
+                        items={filtered.map((expert) => expert.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {filtered.map((expert, index) => (
+                          <SortableExpertListRow
+                            key={expert.id}
+                            expert={expert}
+                            isActive={expert.id === selectedId}
+                            canReorder={canReorder}
+                            isAnimatingListIntro={isAnimatingListIntro}
+                            index={index}
                             onSelect={selectExpert}
-                            isOverlay
                           />
-                        </div>
-                      ) : null}
-                    </DragOverlay>,
-                    document.body
-                  )
-                : null}
-            </DndContext>
-          </div>
+                        ))}
+                      </SortableContext>
+                    )}
+                  </div>
+                </ScrollArea>
 
-          <div className="p-5 pr-14 md:p-6 md:pr-16">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                  {headerLabel}
-                </p>
-                <p className="mt-1 text-sm text-foreground/70">
-                  System prompt controls behavior. Suggestion question is the starter chip.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-black/10 bg-white/70"
-                  disabled={isGenerating || isSaving}
-                  onClick={generateWithAI}
-                >
-                  {isGenerating ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  Generate with AI
-                </Button>
-                <Button
-                  type="button"
-                  className="bg-black text-white hover:bg-black/90"
-                  disabled={isSaving || isGenerating}
-                  onClick={() => void save()}
-                >
-                  {isSaving ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Check className="mr-2 h-4 w-4" />
-                  )}
-                  Save
-                </Button>
-              </div>
+                {isClient
+                  ? createPortal(
+                      <DragOverlay>
+                        {activeDragExpert ? (
+                          <div style={getExpertDragOverlayStyle(activeDragWidth)}>
+                            <ExpertListRowContent
+                              expert={activeDragExpert}
+                              isActive={activeDragExpert.id === selectedId}
+                              canReorder
+                              onSelect={selectExpert}
+                              isOverlay
+                            />
+                          </div>
+                        ) : null}
+                      </DragOverlay>,
+                      document.body
+                    )
+                  : null}
+              </DndContext>
             </div>
 
-            {error ? (
-              <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs text-red-700">
-                {error}
-              </div>
-            ) : null}
-
-            <div className="mt-5 grid gap-3">
-              <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-3.5 shadow-none">
-                <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-medium text-muted-foreground">Name</p>
-                    <Input
-                      value={draft.name}
-                      onChange={(e) => {
-                        const nextName = e.target.value;
-                        setDraft((prev) => {
-                          const next = { ...prev, name: nextName };
-                          const nextSlug = slugify(nextName);
-                          if (!prev.id) return { ...next, slug: nextSlug };
-                          return next;
-                        });
-                      }}
-                      placeholder="e.g. Travel Concierge"
-                      className="bg-white"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-medium text-muted-foreground">Agent name</p>
-                    <Input
-                      value={draft.agent_name}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, agent_name: e.target.value }))}
-                      placeholder="e.g. Kate"
-                      className="bg-white"
-                    />
-                  </div>
+            <div className="p-5 pr-14 md:p-6 md:pr-16">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                    {headerLabel}
+                  </p>
+                  <p className="mt-1 text-sm text-foreground/70">
+                    System prompt controls behavior. Suggestion question is the starter chip.
+                  </p>
                 </div>
 
-                <div className="mt-2.5 space-y-1">
-                  <p className="text-[11px] font-medium text-muted-foreground">Description</p>
-                  <Textarea
-                    value={draft.description}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="What does this expert do? What tone?"
-                    className="min-h-[84px] bg-white text-sm"
-                  />
-                </div>
-              </Card>
-
-              <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-4 shadow-none">
-                <div className="flex items-center justify-between gap-2.5">
-                  <div>
-                    <p className="text-[11px] font-medium text-muted-foreground">System prompt</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Keep it crisp—this is your “behavior contract”.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 rounded-full"
-                    onClick={() => void copyText("system_prompt")}
-                    disabled={!draft.system_prompt.trim()}
-                  >
-                    <Copy className="mr-2 h-4 w-4" />
-                    {copied === "system_prompt" ? "Copied" : "Copy"}
-                  </Button>
-                </div>
-                <Textarea
-                  value={draft.system_prompt}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, system_prompt: e.target.value }))}
-                  placeholder="Write the system prompt…"
-                  className="mt-2.5 min-h-[180px] bg-white text-sm leading-relaxed"
-                />
-              </Card>
-
-              <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-3.5 shadow-none">
-                <div className="flex items-center justify-between gap-2.5">
-                  <div>
-                    <p className="text-[11px] font-medium text-muted-foreground">Suggestion question</p>
-                    <p className="text-[11px] text-muted-foreground">One starter question.</p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 rounded-full"
-                    onClick={() => void copyText("suggestion_question")}
-                    disabled={!draft.suggestion_question.trim()}
-                  >
-                    <Copy className="mr-2 h-4 w-4" />
-                    {copied === "suggestion_question" ? "Copied" : "Copy"}
-                  </Button>
-                </div>
-                <Textarea
-                  value={draft.suggestion_question}
-                  onChange={(e) =>
-                    setDraft((prev) => ({ ...prev, suggestion_question: e.target.value }))
-                  }
-                  placeholder="e.g. Can you help me plan a trip…"
-                  className="mt-2.5 min-h-[84px] bg-white text-sm"
-                />
-              </Card>
-
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     className="border-black/10 bg-white/70"
-                    disabled={!selected || isSaving || isGenerating}
-                    onClick={() => void duplicateSelected()}
+                    disabled={isGenerating || isSaving}
+                    onClick={generateWithAI}
                   >
-                    <Copy className="mr-2 h-4 w-4" />
-                    Duplicate
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-black/10 bg-white/70"
-                    disabled={isDeleting || isSaving || isGenerating || !selected}
-                    onClick={() => void removeSelected()}
-                  >
-                    {isDeleting ? (
+                    {isGenerating ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Trash2 className="mr-2 h-4 w-4" />
+                      <Sparkles className="mr-2 h-4 w-4" />
                     )}
-                    Delete
+                    Generate with AI
+                  </Button>
+                  <Button
+                    type="button"
+                    className="bg-black text-white hover:bg-black/90"
+                    disabled={isSaving || isGenerating}
+                    onClick={() => void save()}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="mr-2 h-4 w-4" />
+                    )}
+                    Save
                   </Button>
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                  {isDirty ? (
-                    <Badge variant="secondary" className="rounded-full text-[10px]">
-                      Unsaved changes
-                    </Badge>
-                  ) : (
-                    <span>Up to date</span>
-                  )}
+              </div>
+
+              {error ? (
+                <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs text-red-700">
+                  {error}
+                </div>
+              ) : null}
+
+              <div className="mt-5 grid gap-3">
+                <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-3.5 shadow-none">
+                  <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-medium text-muted-foreground">Name</p>
+                      <Input
+                        value={draft.name}
+                        onChange={(e) => {
+                          const nextName = e.target.value;
+                          setDraft((prev) => {
+                            const next = { ...prev, name: nextName };
+                            const nextSlug = slugify(nextName);
+                            if (!prev.id) return { ...next, slug: nextSlug };
+                            return next;
+                          });
+                        }}
+                        placeholder="e.g. Travel Concierge"
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-medium text-muted-foreground">Agent name</p>
+                      <Input
+                        value={draft.agent_name}
+                        onChange={(e) => setDraft((prev) => ({ ...prev, agent_name: e.target.value }))}
+                        placeholder="e.g. Kate"
+                        className="bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 space-y-1">
+                    <p className="text-[11px] font-medium text-muted-foreground">Description</p>
+                    <Textarea
+                      value={draft.description}
+                      onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
+                      placeholder="What does this expert do? What tone?"
+                      className="min-h-[84px] bg-white text-sm"
+                    />
+                  </div>
+                </Card>
+
+                <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-4 shadow-none">
+                  <div className="flex items-center justify-between gap-2.5">
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground">System prompt</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Keep it crisp—this is your “behavior contract”.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 rounded-full"
+                      onClick={() => void copyText("system_prompt")}
+                      disabled={!draft.system_prompt.trim()}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      {copied === "system_prompt" ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={draft.system_prompt}
+                    onChange={(e) => setDraft((prev) => ({ ...prev, system_prompt: e.target.value }))}
+                    placeholder="Write the system prompt…"
+                    className="mt-2.5 min-h-[180px] bg-white text-sm leading-relaxed"
+                  />
+                </Card>
+
+                <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-3.5 shadow-none">
+                  <div className="flex items-center justify-between gap-2.5">
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground">Suggestion question</p>
+                      <p className="text-[11px] text-muted-foreground">One starter question.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 rounded-full"
+                      onClick={() => void copyText("suggestion_question")}
+                      disabled={!draft.suggestion_question.trim()}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      {copied === "suggestion_question" ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={draft.suggestion_question}
+                    onChange={(e) =>
+                      setDraft((prev) => ({ ...prev, suggestion_question: e.target.value }))
+                    }
+                    placeholder="e.g. Can you help me plan a trip…"
+                    className="mt-2.5 min-h-[84px] bg-white text-sm"
+                  />
+                </Card>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-black/10 bg-white/70"
+                      disabled={!selected || isSaving || isGenerating}
+                      onClick={() => void duplicateSelected()}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      Duplicate
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-black/10 bg-white/70"
+                      disabled={isDeleting || isSaving || isGenerating || !selected}
+                      onClick={() => setDeleteConfirmOpen(true)}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                      )}
+                      Delete
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {isDirty ? (
+                      <Badge variant="secondary" className="rounded-full text-[10px]">
+                        Unsaved changes
+                      </Badge>
+                    ) : (
+                      <span>Up to date</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent
+          className="max-w-md border-white/60 bg-[var(--panel-strong)]/95 shadow-[0_30px_90px_-50px_rgba(20,20,60,0.7)]"
+          showCloseButton={false}
+        >
+          <DialogHeader className="text-left">
+            <DialogTitle>Delete expert?</DialogTitle>
+            <DialogDescription>
+              {selected
+                ? `This will delete "${selected.name}" and all chat sessions and messages that use it. This action cannot be undone.`
+                : "This expert is no longer available."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-black/10 bg-white/70"
+              disabled={isDeleting}
+              onClick={() => setDeleteConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={isDeleting || !selected}
+              onClick={() => void removeSelected()}
+            >
+              {isDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Delete expert
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

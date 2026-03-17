@@ -57,6 +57,11 @@ export type SessionsPanelProps = {
   onDeleteSession: (session: SessionItem) => void | Promise<void>;
   formatRelativeTime: (thenIso: string, nowMs: number) => string;
   onExpertsUpdated?: (experts: ExpertRow[]) => void;
+  onExpertDeleted?: (payload: {
+    expertId: string;
+    deletedSessionIds: string[];
+    experts: ExpertRow[];
+  }) => void;
 };
 
 export function SessionsPanel({
@@ -72,6 +77,7 @@ export function SessionsPanel({
   onDeleteSession,
   formatRelativeTime,
   onExpertsUpdated,
+  onExpertDeleted,
 }: SessionsPanelProps) {
   const [expertDialogOpen, setExpertDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
@@ -275,6 +281,7 @@ export function SessionsPanel({
           onOpenChange={setExpertDialogOpen}
           experts={experts}
           onExpertsUpdated={onExpertsUpdated}
+          onExpertDeleted={onExpertDeleted}
         />
         <ChangePasswordDialog
           open={passwordDialogOpen}

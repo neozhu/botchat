@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { getAuthScreen, type AuthScreenMode } from "./auth-view-state";
 
 const initialAuthActionState: AuthActionState = {
@@ -169,10 +170,9 @@ export function AuthForm() {
               <label className="text-sm font-medium" htmlFor="sign-in-password">
                 Password
               </label>
-              <Input
+              <PasswordInput
                 id="sign-in-password"
                 name="password"
-                type="password"
                 autoComplete="current-password"
                 placeholder="••••••••"
                 required
@@ -210,10 +210,9 @@ export function AuthForm() {
               <label className="text-sm font-medium" htmlFor="sign-up-password">
                 Password
               </label>
-              <Input
+              <PasswordInput
                 id="sign-up-password"
                 name="password"
-                type="password"
                 autoComplete="new-password"
                 placeholder="Choose a strong password"
                 required

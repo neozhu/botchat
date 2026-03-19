@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const initialPasswordState: PasswordActionState = {
   error: null,
@@ -61,10 +61,9 @@ function ChangePasswordDialogBody({
             <label className="text-sm font-medium" htmlFor="change-password-new">
               New password
             </label>
-            <Input
+            <PasswordInput
               id="change-password-new"
               name="password"
-              type="password"
               autoComplete="new-password"
               placeholder="Choose a new password"
               required
@@ -76,10 +75,9 @@ function ChangePasswordDialogBody({
             <label className="text-sm font-medium" htmlFor="change-password-confirm">
               Confirm password
             </label>
-            <Input
+            <PasswordInput
               id="change-password-confirm"
               name="confirmPassword"
-              type="password"
               autoComplete="new-password"
               placeholder="Repeat the new password"
               required

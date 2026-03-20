@@ -1,7 +1,13 @@
 "use client";
 
 import type { UIMessage } from "ai";
-import type { ClipboardEvent, DragEvent, FormEvent } from "react";
+import type {
+  ClipboardEvent,
+  DragEvent,
+  FormEvent,
+  MouseEvent,
+  PointerEvent,
+} from "react";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
@@ -401,8 +407,16 @@ export function ChatPanel({
   const activeExpertCard = getActiveExpertCardDetails(activeExpert);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const presetExpertsScrollerRef = useRef<HTMLDivElement | null>(null);
   const dragDepthRef = useRef(0);
+  const presetExpertsDragRef = useRef({
+    pointerId: null as number | null,
+    startX: 0,
+    startScrollLeft: 0,
+  });
+  const suppressPresetExpertClickRef = useRef(false);
   const [isTextareaDragActive, setIsTextareaDragActive] = useState(false);
+  const [isPresetExpertsDragging, setIsPresetExpertsDragging] = useState(false);
   const previews = useMemo(
     () =>
       pendingFiles.map((file) => ({
@@ -601,6 +615,68 @@ export function ChatPanel({
 
     appendPendingFiles(files);
     textareaRef.current?.focus();
+  };
+
+  const stopPresetExpertsDragging = (pointerId?: number) => {
+    const container = presetExpertsScrollerRef.current;
+    const activePointerId = presetExpertsDragRef.current.pointerId;
+
+    if (pointerId !== undefined && activePointerId !== pointerId) {
+      return;
+    }
+
+    if (container && activePointerId !== null && container.hasPointerCapture(activePointerId)) {
+      container.releasePointerCapture(activePointerId);
+    }
+
+    presetExpertsDragRef.current.pointerId = null;
+    presetExpertsDragRef.current.startX = 0;
+    presetExpertsDragRef.current.startScrollLeft = 0;
+    setIsPresetExpertsDragging(false);
+  };
+
+  const handlePresetExpertsPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    const container = presetExpertsScrollerRef.current;
+    if (!container) {
+      return;
+    }
+
+    presetExpertsDragRef.current.pointerId = event.pointerId;
+    presetExpertsDragRef.current.startX = event.clientX;
+    presetExpertsDragRef.current.startScrollLeft = container.scrollLeft;
+    suppressPresetExpertClickRef.current = false;
+    container.setPointerCapture(event.pointerId);
+  };
+
+  const handlePresetExpertsPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const container = presetExpertsScrollerRef.current;
+    if (!container || presetExpertsDragRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - presetExpertsDragRef.current.startX;
+    if (Math.abs(deltaX) < 4) {
+      return;
+    }
+
+    suppressPresetExpertClickRef.current = true;
+    setIsPresetExpertsDragging(true);
+    container.scrollLeft = presetExpertsDragRef.current.startScrollLeft - deltaX;
+    event.preventDefault();
+  };
+
+  const handlePresetExpertsClickCapture = (event: MouseEvent<HTMLDivElement>) => {
+    if (!suppressPresetExpertClickRef.current) {
+      return;
+    }
+
+    suppressPresetExpertClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   return (
@@ -887,30 +963,46 @@ export function ChatPanel({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                <span>Preset experts</span>
-                {isLoadingExperts
-                  ? Array.from({ length: 4 }).map((_, index) => (
-                      <Skeleton
-                        key={`expert-skeleton-${index}`}
-                        className="h-6 w-24 rounded-full bg-muted/60"
-                      />
-                    ))
-                  : experts.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => void onCreateSessionForExpert(preset.id)}
-                        className={cn(
-                          "rounded-full px-2.5 py-1 text-xs font-medium transition",
-                          preset.id === activeExpertId
-                            ? "bg-[var(--accent-line)] text-white shadow-[0_10px_22px_-16px_rgba(126,92,186,0.7)]"
-                            : "bg-[var(--accent-line)]/10 text-[var(--accent-line)] hover:bg-[var(--accent-line)]/20"
-                        )}
-                      >
-                        {preset.name}
-                      </button>
-                    ))}
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="hidden shrink-0 sm:inline">Preset experts</span>
+                <div
+                  ref={presetExpertsScrollerRef}
+                  className={cn(
+                    "min-w-0 flex-1 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x",
+                    isPresetExpertsDragging ? "cursor-grabbing select-none" : "cursor-grab"
+                  )}
+                  onPointerDown={handlePresetExpertsPointerDown}
+                  onPointerMove={handlePresetExpertsPointerMove}
+                  onPointerUp={(event) => stopPresetExpertsDragging(event.pointerId)}
+                  onPointerCancel={(event) => stopPresetExpertsDragging(event.pointerId)}
+                  onLostPointerCapture={(event) => stopPresetExpertsDragging(event.pointerId)}
+                  onClickCapture={handlePresetExpertsClickCapture}
+                >
+                  <div className="flex w-max min-w-full items-center gap-1.5 whitespace-nowrap pr-1">
+                    {isLoadingExperts
+                      ? Array.from({ length: 4 }).map((_, index) => (
+                          <Skeleton
+                            key={`expert-skeleton-${index}`}
+                            className="h-6 w-24 shrink-0 rounded-full bg-muted/60"
+                          />
+                        ))
+                      : experts.map((preset) => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => void onCreateSessionForExpert(preset.id)}
+                            className={cn(
+                              "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition",
+                              preset.id === activeExpertId
+                                ? "bg-[var(--accent-line)] text-white shadow-[0_10px_22px_-16px_rgba(126,92,186,0.7)]"
+                                : "bg-[var(--accent-line)]/10 text-[var(--accent-line)] hover:bg-[var(--accent-line)]/20"
+                            )}
+                          >
+                            {preset.name}
+                          </button>
+                        ))}
+                  </div>
+                </div>
               </div>
             </form>
           </div>

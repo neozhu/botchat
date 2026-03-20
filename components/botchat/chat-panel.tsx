@@ -35,6 +35,7 @@ import {
   normalizeClipboardFiles,
   shouldPreventClipboardPasteDefault,
 } from "@/lib/botchat/chat-clipboard";
+import { getComposerTextareaSizing } from "@/lib/botchat/chat-composer";
 import { formatTimelineDay, getTimelineDayKey } from "@/lib/botchat/chat-timeline";
 import {
   THINKING_BUBBLE_DOT_CLASSNAMES,
@@ -529,8 +530,12 @@ export function ChatPanel({
     if (!textarea) return;
 
     textarea.style.height = "0px";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 240)}px`;
-    textarea.style.overflowY = textarea.scrollHeight > 240 ? "auto" : "hidden";
+    const sizing = getComposerTextareaSizing({
+      scrollHeight: textarea.scrollHeight,
+      viewportWidth: window.innerWidth,
+    });
+    textarea.style.height = `${sizing.height}px`;
+    textarea.style.overflowY = sizing.overflowY;
   }, [input]);
 
   const appendPendingFiles = (files: File[]) => {

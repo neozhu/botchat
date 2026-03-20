@@ -919,7 +919,7 @@ export function ChatPanel({
                         ? "Drop files here to attach"
                         : "Type a message"
                     }
-                    className="max-h-60 min-h-0 resize-none overflow-y-hidden border-none bg-transparent p-0 text-sm leading-6 shadow-none focus-visible:ring-0"
+                    className="max-h-60 min-h-0 resize-none overflow-y-hidden border-none bg-transparent p-0 text-base leading-6 shadow-none [field-sizing:fixed] focus-visible:ring-0 md:text-sm"        
                   />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5">

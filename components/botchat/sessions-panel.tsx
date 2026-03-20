@@ -141,7 +141,7 @@ export function SessionsPanel({
                   <SidebarMenuItem
                     key={item.id}
                     className={cn(
-                      "group relative transition-[opacity,transform] duration-200",
+                      "group/session-item relative transition-[opacity,transform] duration-200",
                       isDeleting && "opacity-60",
                       isRemoving && "pointer-events-none opacity-0 translate-x-2"
                     )}
@@ -190,7 +190,7 @@ export function SessionsPanel({
                         "absolute right-2.5 top-2.5 h-6 w-6 rounded-full text-muted-foreground opacity-0 transition",
                         "hover:bg-red-500/10 hover:text-red-600",
                         item.id === activeSessionId && "opacity-100",
-                        "group-hover:opacity-100"
+                        "group-hover/session-item:opacity-100"
                       )}
                       onClick={(event) => {
                         event.preventDefault();

@@ -931,7 +931,6 @@ export function ChatPanel({
                   <div className="flex flex-wrap items-center gap-1.5">
                     <ToolbarIcon icon={MessageCircle} label="Message type" />
                     <ToolbarIcon icon={Mic} label="Voice note" />
-                    <ToolbarIcon icon={Hash} label="Topic tags" />
                     <ToolbarIcon
                       icon={Brain}
                       label={isHighReasoning ? "Reasoning: High" : "Reasoning: Low"}
@@ -954,7 +953,6 @@ export function ChatPanel({
                       disabled={!canSend}
                       onClick={() => fileInputRef.current?.click()}
                     />
-                    <ToolbarIcon icon={Smile} label="Emoji" />
                     <ToolbarIcon icon={Wand2} label="AI assist" highlight />
                   </div>
                   <Button

@@ -317,7 +317,7 @@ const MessageBubble = memo(function MessageBubble({
               variant="ghost"
               aria-label={copied ? "Copied" : "Copy response"}
               className={cn(
-                "h-7 w-7 rounded-full border border-white/12 bg-black/20 text-white/80 opacity-0 shadow-sm backdrop-blur-sm transition-opacity duration-150 pointer-events-none group-hover/message:opacity-100 group-hover/message:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:bg-black/30 hover:text-white",
+                "h-7 w-7 rounded-full border border-white/12 bg-black/20 text-white/80 opacity-0 shadow-sm backdrop-blur-sm transition-opacity duration-150 pointer-events-none group-hover/message:opacity-100 group-hover/message:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:bg-black/30 hover:text-white [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100",
                 copied &&
                   "opacity-100 pointer-events-auto border-[var(--accent-line)]/40 bg-white/90 text-[var(--accent-line)] hover:bg-white"
               )}
@@ -637,11 +637,17 @@ export function ChatPanel({
     presetExpertsDragRef.current.pointerId = null;
     presetExpertsDragRef.current.startX = 0;
     presetExpertsDragRef.current.startScrollLeft = 0;
+    suppressPresetExpertClickRef.current = false;
     setIsPresetExpertsDragging(false);
   };
 
   const handlePresetExpertsPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    const eventTarget = event.target as HTMLElement | null;
+    if (eventTarget?.closest("button, a, input, textarea, select, [role='button']")) {
       return;
     }
 

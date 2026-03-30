@@ -20,7 +20,11 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarSeparator,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { getSidebarChrome } from "@/lib/botchat/sidebar-chrome";
 import { ExpertSettingsDialog } from "@/components/botchat/expert-settings-dialog";
 import type { ExpertRow } from "@/lib/botchat/types";
 import { cn } from "@/lib/utils";
@@ -29,7 +33,6 @@ import {
   KeyRound,
   Loader2,
   LogOut,
-  PanelLeft,
   Settings,
   SlidersHorizontal,
   Trash2,
@@ -52,7 +55,6 @@ export type SessionsPanelProps = {
   deletingSessionIds: Set<string>;
   removingSessionIds: Set<string>;
   nowMs: number;
-  onToggleSidebar: () => void;
   onSelectSession: (session: SessionItem) => void | Promise<void>;
   onDeleteSession: (session: SessionItem) => void | Promise<void>;
   formatRelativeTime: (thenIso: string, nowMs: number) => string;
@@ -72,7 +74,6 @@ export function SessionsPanel({
   deletingSessionIds,
   removingSessionIds,
   nowMs,
-  onToggleSidebar,
   onSelectSession,
   onDeleteSession,
   formatRelativeTime,
@@ -81,12 +82,15 @@ export function SessionsPanel({
 }: SessionsPanelProps) {
   const [expertDialogOpen, setExpertDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const { setOpenMobile } = useSidebar();
+  const sidebarChrome = getSidebarChrome(isMobile);
 
   return (
     <Sidebar
       collapsible="icon"
       className="border border-white/60 bg-[var(--panel-soft)]/90 shadow-[0_20px_60px_-40px_rgba(30,20,60,0.45)] backdrop-blur"
-      mobileBehavior="icon"
+      mobileBehavior={sidebarChrome.mobileBehavior}
     >
       <SidebarHeader className="gap-3 pb-2 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pb-0">
         <div className="flex items-center justify-between px-2.5 pt-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
@@ -103,14 +107,7 @@ export function SessionsPanel({
             )}
           </div>
           <div className="flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 rounded-full"
-              onClick={onToggleSidebar}
-            >
-              <PanelLeft className="h-4 w-4" />
-            </Button>
+            <SidebarTrigger className="h-8 w-8 rounded-full" />
           </div>
         </div>
         <SidebarSeparator className="bg-black/10 group-data-[collapsible=icon]:hidden" />
@@ -157,7 +154,10 @@ export function SessionsPanel({
                           : "hover:bg-white/70"
                       )}
                       onClick={() => {
-                        void onSelectSession(item);
+                        void (async () => {
+                          await onSelectSession(item);
+                          if (isMobile) setOpenMobile(false);
+                        })();
                       }}
                     >
                       <Avatar className="h-7 w-7 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">

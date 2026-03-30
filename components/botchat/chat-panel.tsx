@@ -27,9 +27,11 @@ import {
 } from "@/components/ui/hover-card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SidebarInset } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { getSidebarChrome } from "@/lib/botchat/sidebar-chrome";
 import { getActiveExpertCardDetails } from "@/lib/botchat/active-expert-card";
 import {
   normalizeClipboardFiles,
@@ -405,6 +407,8 @@ export function ChatPanel({
   setPendingFiles,
   isUploadingAttachments,
 }: ChatPanelProps) {
+  const isMobile = useIsMobile();
+  const sidebarChrome = getSidebarChrome(isMobile);
   const activeExpertCard = getActiveExpertCardDetails(activeExpert);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -689,15 +693,20 @@ export function ChatPanel({
       <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col">
         <section className="relative flex h-full flex-col rounded-[32px] border border-white/60 bg-[var(--panel-strong)]/85 shadow-[0_30px_80px_-45px_rgba(24,30,70,0.5)] backdrop-blur">
           <div className="flex items-start justify-between gap-4 px-6 pt-4">
-            <div className="min-w-0 space-y-0">
-              {activeExpert ? (
-                <p className="truncate text-[11px] text-muted-foreground">
-                  Preset: {activeExpert.name}
-                </p>
+            <div className="flex min-w-0 items-start gap-3">
+              {sidebarChrome.showChatTrigger ? (
+                <SidebarTrigger className="mt-0.5 h-9 w-9 rounded-full md:hidden" />
               ) : null}
-              <h1 className="truncate font-[var(--font-display)] text-[1.6rem] leading-none font-semibold tracking-tight">
-                {botName}
-              </h1>
+              <div className="min-w-0 space-y-0">
+                {activeExpert ? (
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    Preset: {activeExpert.name}
+                  </p>
+                ) : null}
+                <h1 className="truncate font-[var(--font-display)] text-[1.6rem] leading-none font-semibold tracking-tight">
+                  {botName}
+                </h1>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <HoverCard openDelay={150}>

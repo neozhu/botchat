@@ -6,6 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
+import { getSidebarPresentation } from "@/lib/botchat/sidebar-presentation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -166,6 +167,12 @@ function Sidebar({
   mobileBehavior?: "sheet" | "icon"
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const presentation = getSidebarPresentation({
+    isMobile,
+    mobileBehavior,
+    collapsible,
+    state,
+  })
 
   if (collapsible === "none") {
     return (
@@ -211,11 +218,12 @@ function Sidebar({
     return (
       <div
         className={cn(
-          "group text-sidebar-foreground flex h-svh w-(--sidebar-width-icon) flex-col border-r",
+          "group text-sidebar-foreground flex h-svh flex-col border-r transition-[width] duration-200 ease-linear",
+          presentation.mobileIconWidthClassName,
           className
         )}
         data-state={state}
-        data-collapsible="icon"
+        data-collapsible={presentation.collapsibleDataValue}
         data-variant={variant}
         data-side={side}
         data-slot="sidebar"
@@ -239,7 +247,7 @@ function Sidebar({
         mobileBehavior === "icon" ? "block" : "hidden md:block"
       )}
       data-state={state}
-      data-collapsible={state === "collapsed" ? collapsible : ""}
+      data-collapsible={presentation.collapsibleDataValue}
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"

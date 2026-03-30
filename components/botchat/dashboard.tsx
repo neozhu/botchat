@@ -14,7 +14,6 @@ import type {
   SessionRow,
 } from "@/lib/botchat/types";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 function messageText(message: UIMessage) {
   const parts = (message as UIMessage).parts ?? [];
@@ -140,7 +139,6 @@ export default function BotchatDashboard({
   });
 
   const [input, setInput] = useState("");
-  const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const activeExpert = useMemo(
@@ -152,7 +150,6 @@ export default function BotchatDashboard({
   const botInitials = initialsFromName(botName);
   const suggestionText =
     activeExpert?.suggestion_question ?? "What should the assistant ask next?";
-  const providerOpen = isMobile ? false : sidebarOpen;
   const isLoadingExperts = false;
   const isLoadingSessions = false;
 
@@ -620,10 +617,8 @@ export default function BotchatDashboard({
   };
   return (
     <SidebarProvider
-      open={providerOpen}
-      onOpenChange={(open) => {
-        if (!isMobile) setSidebarOpen(open);
-      }}
+      open={sidebarOpen}
+      onOpenChange={setSidebarOpen}
       className="h-dvh w-full overflow-hidden"
     >
       <SessionsPanel
@@ -634,7 +629,6 @@ export default function BotchatDashboard({
         deletingSessionIds={deletingSessionIds}
         removingSessionIds={removingSessionIds}
         nowMs={nowMs}
-        onToggleSidebar={() => setSidebarOpen((open) => !open)}
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         formatRelativeTime={formatRelativeTime}

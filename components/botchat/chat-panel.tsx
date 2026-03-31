@@ -535,8 +535,8 @@ export function ChatPanel({
 
     textarea.style.height = "0px";
     const sizing = getComposerTextareaSizing({
+      value: input,
       scrollHeight: textarea.scrollHeight,
-      viewportWidth: window.innerWidth,
     });
     textarea.style.height = `${sizing.height}px`;
     textarea.style.overflowY = sizing.overflowY;

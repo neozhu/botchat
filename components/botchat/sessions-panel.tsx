@@ -212,7 +212,7 @@ export function SessionsPanel({
 
       <SidebarFooter className="mt-auto px-2.5 pb-3">
         <SidebarMenu className="gap-1">
-          <Collapsible defaultOpen={false} className="group/settings">
+          <Collapsible asChild defaultOpen={false} className="group/settings">
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton

@@ -71,7 +71,7 @@ test("buildExpertGenerationPrompt handles weak ordinary-user persona input", () 
   assert.match(prompt, /safely narrow the scope to a specific, useful domain/i);
 });
 
-test("buildExpertGenerationPrompt requires generated experts to include basic fallback logic", () => {
+test("buildExpertGenerationPrompt requires generated experts to be proactive and guiding", () => {
   const prompt = buildExpertGenerationPrompt({
     name: "写作助手",
     agentName: "Writer",
@@ -79,5 +79,6 @@ test("buildExpertGenerationPrompt requires generated experts to include basic fa
     languageHint: "Chinese",
   });
 
-  assert.match(prompt, /ask clarifying questions if the user request is ambiguous/i);
+  assert.match(prompt, /instruct the ai to be proactive and guiding/i);
+  assert.match(prompt, /pair the question with a helpful initial assessment/i);
 });

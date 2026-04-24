@@ -47,8 +47,9 @@ import {
 import { cn } from "@/lib/utils";
 import {
   Brain,
-  Hash,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Globe,
   Info,
@@ -57,7 +58,6 @@ import {
   MoreHorizontal,
   Paperclip,
   Send,
-  Smile,
   Wand2,
   X,
 } from "lucide-react";
@@ -694,6 +694,19 @@ export function ChatPanel({
     event.stopPropagation();
   };
 
+  const scrollPresetExperts = (direction: "previous" | "next") => {
+    const container = presetExpertsScrollerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const distance = Math.max(container.clientWidth * 0.75, 160);
+    container.scrollBy({
+      left: direction === "previous" ? -distance : distance,
+      behavior: "smooth",
+    });
+  };
+
   return (
     <SidebarInset className="h-dvh overflow-hidden p-3 lg:p-4">
       <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col">
@@ -981,46 +994,69 @@ export function ChatPanel({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="hidden shrink-0 sm:inline">Preset experts</span>
-                <div
-                  ref={presetExpertsScrollerRef}
-                  className={cn(
-                    "min-w-0 flex-1 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x",
-                    isPresetExpertsDragging ? "cursor-grabbing select-none" : "cursor-grab"
-                  )}
-                  onPointerDown={handlePresetExpertsPointerDown}
-                  onPointerMove={handlePresetExpertsPointerMove}
-                  onPointerUp={(event) => stopPresetExpertsDragging(event.pointerId)}
-                  onPointerCancel={(event) => stopPresetExpertsDragging(event.pointerId)}
-                  onLostPointerCapture={(event) => stopPresetExpertsDragging(event.pointerId)}
-                  onClickCapture={handlePresetExpertsClickCapture}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  aria-label="Scroll preset experts left"
+                  disabled={isLoadingExperts}
+                  className="h-8 w-8 shrink-0 rounded-full border-[var(--accent-line)]/35 bg-white/90 text-[var(--accent-line)] shadow-sm hover:border-[var(--accent-line)]/50 hover:bg-[var(--accent-line)]/10 hover:text-[var(--accent-line)] disabled:opacity-40"
+                  onClick={() => scrollPresetExperts("previous")}
                 >
-                  <div className="flex w-max min-w-full items-center gap-1.5 whitespace-nowrap pr-1">
-                    {isLoadingExperts
-                      ? Array.from({ length: 4 }).map((_, index) => (
-                          <Skeleton
-                            key={`expert-skeleton-${index}`}
-                            className="h-6 w-24 shrink-0 rounded-full bg-muted/60"
-                          />
-                        ))
-                      : experts.map((preset) => (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() => void onCreateSessionForExpert(preset.id)}
-                            className={cn(
-                              "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition",
-                              preset.id === activeExpertId
-                                ? "bg-[var(--accent-line)] text-white shadow-[0_10px_22px_-16px_rgba(126,92,186,0.7)]"
-                                : "bg-[var(--accent-line)]/10 text-[var(--accent-line)] hover:bg-[var(--accent-line)]/20"
-                            )}
-                          >
-                            {preset.name}
-                          </button>
-                        ))}
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="min-w-0 flex-1">
+                  <div
+                    ref={presetExpertsScrollerRef}
+                    className={cn(
+                      "flex h-8 min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x",
+                      isPresetExpertsDragging ? "cursor-grabbing select-none" : "cursor-grab"
+                    )}
+                    onPointerDown={handlePresetExpertsPointerDown}
+                    onPointerMove={handlePresetExpertsPointerMove}
+                    onPointerUp={(event) => stopPresetExpertsDragging(event.pointerId)}
+                    onPointerCancel={(event) => stopPresetExpertsDragging(event.pointerId)}
+                    onLostPointerCapture={(event) => stopPresetExpertsDragging(event.pointerId)}
+                    onClickCapture={handlePresetExpertsClickCapture}
+                  >
+                    <div className="flex w-max min-w-full items-center gap-1.5 whitespace-nowrap pr-1">
+                      {isLoadingExperts
+                        ? Array.from({ length: 4 }).map((_, index) => (
+                            <Skeleton
+                              key={`expert-skeleton-${index}`}
+                              className="h-6 w-24 shrink-0 rounded-full bg-muted/60"
+                            />
+                          ))
+                        : experts.map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => void onCreateSessionForExpert(preset.id)}
+                              className={cn(
+                                "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition",
+                                preset.id === activeExpertId
+                                  ? "bg-[var(--accent-line)] text-white shadow-[0_10px_22px_-16px_rgba(126,92,186,0.7)]"
+                                  : "bg-[var(--accent-line)]/10 text-[var(--accent-line)] hover:bg-[var(--accent-line)]/20"
+                              )}
+                            >
+                              {preset.name}
+                            </button>
+                          ))}
+                    </div>
                   </div>
                 </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  aria-label="Scroll preset experts right"
+                  disabled={isLoadingExperts}
+                  className="h-8 w-8 shrink-0 rounded-full border-[var(--accent-line)]/35 bg-white/90 text-[var(--accent-line)] shadow-sm hover:border-[var(--accent-line)]/50 hover:bg-[var(--accent-line)]/10 hover:text-[var(--accent-line)] disabled:opacity-40"
+                  onClick={() => scrollPresetExperts("next")}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             </form>
           </div>

@@ -1,9 +1,20 @@
-import { convertToModelMessages, stepCountIs, streamText, tool } from "ai";
+import {
+  convertToModelMessages,
+  generateText,
+  stepCountIs,
+  streamText,
+  tool,
+  type UIMessage,
+} from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { normalizeReasoningEffort } from "@/lib/ai/reasoning-effort";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOpenAIModelId } from "@/lib/ai/openai";
+import {
+  buildConversationSummaryPrompt,
+  prepareChatModelContext,
+} from "@/lib/botchat/chat-context";
 
 export const maxDuration = 30;
 
@@ -135,7 +146,29 @@ export async function POST(request: Request) {
     system = `${system}\n\n${buildCurrentSystemDateTimeContext()}`;
   }
 
-  const modelMessages = await convertToModelMessages(messages);
+  const preparedContext = await prepareChatModelContext(messages as UIMessage[], {
+    summarizeMessages: async (messagesToSummarize) => {
+      const { text } = await generateText({
+        model: openai(getOpenAIModelId()),
+        providerOptions: {
+          openai: {
+            reasoningEffort,
+          },
+        },
+        system:
+          "You compress earlier chat history for a follow-up AI request. Preserve facts, decisions, constraints, and unresolved user intent. Do not answer the user.",
+        prompt: buildConversationSummaryPrompt(messagesToSummarize),
+      });
+
+      return text;
+    },
+  });
+
+  if (preparedContext.systemContext) {
+    system = `${system}\n\n${preparedContext.systemContext}`;
+  }
+
+  const modelMessages = await convertToModelMessages(preparedContext.messages);
   const result = streamText({
     model: openai(getOpenAIModelId()),
     providerOptions: {

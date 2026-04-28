@@ -223,12 +223,12 @@ export function SessionsPanel({
               variant="ghost"
               size="icon"
               aria-label="Search chat history"
-              className="h-8 w-8 rounded-full group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9"
+              className="h-8 w-8 rounded-full group-data-[collapsible=icon]:order-2 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9"
               onClick={() => setSearchDialogOpen(true)}
             >
               <Search className="h-4 w-4" />
             </Button>
-            <SidebarTrigger className="h-8 w-8 rounded-full group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9" />
+            <SidebarTrigger className="h-8 w-8 rounded-full group-data-[collapsible=icon]:order-1 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9" />
           </div>
         </div>
         <SidebarSeparator className="bg-black/10 group-data-[collapsible=icon]:hidden" />

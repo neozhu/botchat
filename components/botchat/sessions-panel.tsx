@@ -148,10 +148,9 @@ export function SessionsPanel({
 
   const groupedSessions = useMemo(() => {
     const now = new Date(nowMs);
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-    const todayMs = startOfToday.getTime();
     const dayMs = 24 * 60 * 60 * 1000;
+    const todayDayIndex =
+      Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / dayMs;
 
     const groups: Array<{ label: string; items: SessionItem[] }> = [
       { label: "Today", items: [] },
@@ -163,8 +162,13 @@ export function SessionsPanel({
     for (const session of filteredSessions) {
       const updatedAtMs = new Date(session.updated_at).getTime();
       const sessionDay = new Date(updatedAtMs);
-      sessionDay.setHours(0, 0, 0, 0);
-      const ageDays = Math.floor((todayMs - sessionDay.getTime()) / dayMs);
+      const sessionDayIndex =
+        Date.UTC(
+          sessionDay.getFullYear(),
+          sessionDay.getMonth(),
+          sessionDay.getDate()
+        ) / dayMs;
+      const ageDays = todayDayIndex - sessionDayIndex;
 
       if (ageDays <= 0) groups[0]?.items.push(session);
       else if (ageDays === 1) groups[1]?.items.push(session);

@@ -480,7 +480,7 @@ export function SessionsPanel({
               <div className="animate-in fade-in-0 zoom-in-95 duration-200">
                 {groupedSessions.map((group) => (
                   <div key={group.label} className="mb-3">
-                    <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+                    <p className="px-3 py-1 text-[10px] font-medium tracking-[0.04em] text-muted-foreground/70">
                       {group.label}
                     </p>
                     <div className="space-y-1">

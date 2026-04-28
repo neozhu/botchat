@@ -306,6 +306,12 @@ export default function BotchatDashboard({
     setPendingFiles([]);
   };
 
+  const handleCreateSessionFromSidebar = async () => {
+    const expertId = activeExpertId ?? experts[0]?.id ?? null;
+    if (!expertId) return;
+    await handleCreateSessionForExpert(expertId);
+  };
+
   const handleExpertDeleted = async ({
     expertId,
     deletedSessionIds,
@@ -631,6 +637,7 @@ export default function BotchatDashboard({
         nowMs={nowMs}
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
+        onCreateSession={handleCreateSessionFromSidebar}
         formatRelativeTime={formatRelativeTime}
         onExpertsUpdated={setExperts}
         onExpertDeleted={handleExpertDeleted}

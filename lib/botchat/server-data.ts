@@ -118,6 +118,59 @@ export const loadSessions = cache(async () => {
   return (data ?? []) as SessionRow[];
 });
 
+export async function searchSessions(query: string, limit = 100) {
+  const normalized = query.trim();
+  if (!normalized) return [] as SessionRow[];
+
+  const supabase = await createSupabaseServerClient();
+  const like = `%${normalized}%`;
+
+  const [sessionMatches, messageMatches] = await Promise.all([
+    supabase
+      .from("chat_sessions")
+      .select("id, expert_id, title, last_message, created_at, updated_at")
+      .or(`title.ilike.${like},last_message.ilike.${like}`)
+      .order("updated_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("chat_messages")
+      .select("session_id")
+      .ilike("content", like)
+      .order("created_at", { ascending: false })
+      .limit(limit * 4),
+  ]);
+
+  if (sessionMatches.error) throw new Error(sessionMatches.error.message);
+  if (messageMatches.error) throw new Error(messageMatches.error.message);
+
+  const directSessions = (sessionMatches.data ?? []) as SessionRow[];
+  const sessionIdSet = new Set(directSessions.map((row) => row.id));
+
+  const messageSessionIds = (messageMatches.data ?? [])
+    .map((row) => row.session_id)
+    .filter((value): value is string => typeof value === "string")
+    .filter((id) => !sessionIdSet.has(id));
+
+  if (messageSessionIds.length === 0) return directSessions;
+
+  const { data: messageLinkedSessions, error: messageLinkedSessionsError } = await supabase
+    .from("chat_sessions")
+    .select("id, expert_id, title, last_message, created_at, updated_at")
+    .in("id", messageSessionIds)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+
+  if (messageLinkedSessionsError) throw new Error(messageLinkedSessionsError.message);
+
+  const merged = [...directSessions, ...((messageLinkedSessions ?? []) as SessionRow[])];
+  const deduped = new Map<string, SessionRow>();
+  for (const session of merged) deduped.set(session.id, session);
+
+  return [...deduped.values()]
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, limit);
+}
+
 export const loadMessagesForSession = cache(async (sessionId: string) => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase

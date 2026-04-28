@@ -170,8 +170,15 @@ export function SessionsPanel({
       else groups[3]?.items.push(session);
     }
 
-    return groups.filter((group) => group.items.length > 0);
-  }, [filteredSessions, nowMs]);
+    const visibleGroups = groups.filter((group) => group.items.length > 0);
+    if (!normalizedQuery) {
+      return visibleGroups.filter(
+        (group) => group.label === "Today" || group.label === "Yesterday"
+      );
+    }
+
+    return visibleGroups;
+  }, [filteredSessions, normalizedQuery, nowMs]);
 
   const handleSelectFromSearch = (session: SessionItem) => {
     void (async () => {
@@ -473,7 +480,7 @@ export function SessionsPanel({
               <div className="animate-in fade-in-0 zoom-in-95 duration-200">
                 {groupedSessions.map((group) => (
                   <div key={group.label} className="mb-3">
-                    <p className="px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
                       {group.label}
                     </p>
                     <div className="space-y-1">

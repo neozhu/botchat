@@ -482,7 +482,7 @@ export function SessionsPanel({
                           key={session.id}
                           type="button"
                           className={cn(
-                            "flex w-full flex-col items-start rounded-xl px-3 py-2 text-left transition-all duration-200",
+                            "flex w-full items-center rounded-xl px-3 py-2 text-left transition-all duration-200",
                             "animate-in fade-in-0 slide-in-from-bottom-1",
                             session.id === activeSessionId
                               ? "bg-accent"
@@ -490,11 +490,8 @@ export function SessionsPanel({
                           )}
                           onClick={() => handleSelectFromSearch(session)}
                         >
-                          <span className="w-full truncate text-sm font-medium">
+                          <span className="w-full truncate text-[13px] font-medium">
                             {session.title}
-                          </span>
-                          <span className="w-full truncate text-xs text-muted-foreground">
-                            {session.last_message ?? "—"}
                           </span>
                         </button>
                       ))}

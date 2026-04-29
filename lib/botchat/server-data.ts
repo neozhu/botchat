@@ -242,6 +242,13 @@ export async function deleteExpertById(id: string) {
     .filter((sessionId): sessionId is string => typeof sessionId === "string");
 
   if (deletedSessionIds.length > 0) {
+    const { error: deleteMessagesError } = await supabase
+      .from("chat_messages")
+      .delete()
+      .in("session_id", deletedSessionIds);
+
+    if (deleteMessagesError) throw new Error(deleteMessagesError.message);
+
     const { error: deleteSessionsError } = await supabase
       .from("chat_sessions")
       .delete()

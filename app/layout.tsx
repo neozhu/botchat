@@ -1,17 +1,23 @@
 import type { Metadata } from "next";
-import { Fraunces, Lexend } from "next/font/google";
+import { Inter, Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
 
-const displayFont = Fraunces({
+const displayFont = Inter({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["400", "600", "700"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const bodyFont = Lexend({
+const bodyFont = Inter({
   variable: "--font-body",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "500", "600"],
+});
+
+const cjkBodyFont = Noto_Sans_SC({
+  variable: "--font-cjk",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -27,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${displayFont.variable} ${bodyFont.variable} antialiased`}
+        className={`${displayFont.variable} ${bodyFont.variable} ${cjkBodyFont.variable} antialiased`}
       >
         {children}
       </body>

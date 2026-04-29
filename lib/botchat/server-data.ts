@@ -3,6 +3,7 @@ import "server-only";
 import type { UIMessage } from "ai";
 import { cache } from "react";
 import { getCurrentUser } from "@/lib/auth/user";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { expertSeeds } from "@/lib/botchat/expert-seeds";
 import { shouldSeedExperts } from "@/lib/botchat/expert-seeding";
@@ -229,7 +230,7 @@ export async function saveExpert(input: SaveExpertInput) {
 }
 
 export async function deleteExpertById(id: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
   const { data: linkedSessions, error: linkedSessionsError } = await supabase
     .from("chat_sessions")
     .select("id")
@@ -242,6 +243,13 @@ export async function deleteExpertById(id: string) {
     .filter((sessionId): sessionId is string => typeof sessionId === "string");
 
   if (deletedSessionIds.length > 0) {
+    const { error: deleteMessagesError } = await supabase
+      .from("chat_messages")
+      .delete()
+      .in("session_id", deletedSessionIds);
+
+    if (deleteMessagesError) throw new Error(deleteMessagesError.message);
+
     const { error: deleteSessionsError } = await supabase
       .from("chat_sessions")
       .delete()

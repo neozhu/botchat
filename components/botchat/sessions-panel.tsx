@@ -240,12 +240,12 @@ export function SessionsPanel({
         <SidebarSeparator className="bg-black/10 group-data-[collapsible=icon]:hidden" />
       </SidebarHeader>
 
-      <SidebarContent className="px-2.5 pt-1.5 group-data-[collapsible=icon]:hidden">
-        <SidebarMenu className="gap-2">
+      <SidebarContent className="px-1 pt-1.5 group-data-[collapsible=icon]:hidden">
+        <SidebarMenu className="gap-1">
           {isLoadingSessions
             ? Array.from({ length: 2 }).map((_, index) => (
                 <SidebarMenuItem key={`session-skeleton-${index}`}>
-                  <div className="flex min-h-[58px] items-center gap-2.5 rounded-[20px] bg-white/40 px-3 py-2.5 pr-10">
+                  <div className="flex min-h-[58px] items-center gap-2.5 rounded-[20px] bg-white/40 px-2 py-2 pr-10">
                     <Skeleton className="h-7 w-7 rounded-full bg-muted/60" />
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <div className="flex items-center gap-2">

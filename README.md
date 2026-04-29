@@ -42,6 +42,10 @@ Supabase (recommended for sessions/experts/attachments):
 - `PUBLIC_SUPABASE_URL`
 - `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 
+Supabase admin (required for expert deletion to remove all linked sessions/messages):
+
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only secret; never expose to browser/client code)
+
 ### 2) Run
 
 ```bash
@@ -78,7 +82,7 @@ docker compose up -d --build
 
 App is exposed at `http://localhost:3202` (mapped from container `3000`).
 
-Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `PUBLIC_SUPABASE_URL`, and `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` in your deployment platform or `docker-compose.yml`.
+Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in your deployment platform or `docker-compose.yml`.
 
 ## Project structure
 

@@ -8,6 +8,7 @@ import { DefaultChatTransport } from "ai";
 import { ChatPanel } from "@/components/botchat/chat-panel";
 import { SessionsPanel } from "@/components/botchat/sessions-panel";
 import { getReasoningEffortFromToggle } from "@/lib/ai/reasoning-effort";
+import { getOptimisticSessionTitle } from "@/lib/botchat/session-title";
 import type {
   BotchatBootstrapData,
   ExpertRow,
@@ -65,6 +66,13 @@ function formatRelativeTime(thenIso: string, nowMs: number) {
 
 type BotchatDashboardProps = {
   initialData: BotchatBootstrapData;
+};
+
+type SyncedSessionUpdate = {
+  id?: string;
+  title?: string;
+  last_message?: string | null;
+  updated_at?: string;
 };
 
 export default function BotchatDashboard({
@@ -460,14 +468,12 @@ export default function BotchatDashboard({
 
     newMessages.forEach((m) => savedIds.add(m.id));
 
-    const abort = new AbortController();
     const timeout = setTimeout(() => {
       void (async () => {
         try {
           const response = await fetch("/api/messages/sync", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            signal: abort.signal,
             body: JSON.stringify({
               sessionId,
               messages: toUpsert,
@@ -479,9 +485,40 @@ export default function BotchatDashboard({
               "Failed to persist chat messages",
               await response.text()
             );
+            return;
+          }
+
+          const syncPayload = (await response.json()) as {
+            session?: SyncedSessionUpdate;
+          };
+          const syncedSession = syncPayload.session;
+          if (syncedSession?.id === sessionId) {
+            setSessions((prev) =>
+              prev
+                .map((session) =>
+                  session.id === sessionId
+                    ? {
+                        ...session,
+                        ...(typeof syncedSession.title === "string"
+                          ? { title: syncedSession.title }
+                          : {}),
+                        ...(typeof syncedSession.last_message === "string"
+                          ? { last_message: syncedSession.last_message }
+                          : {}),
+                        ...(typeof syncedSession.updated_at === "string"
+                          ? { updated_at: syncedSession.updated_at }
+                          : {}),
+                      }
+                    : session
+                )
+                .sort(
+                  (a, b) =>
+                    new Date(b.updated_at).getTime() -
+                    new Date(a.updated_at).getTime()
+                )
+            );
           }
         } catch (error) {
-          if ((error as { name?: string }).name === "AbortError") return;
           console.error("Failed to persist chat messages", error);
         }
       })();
@@ -489,7 +526,6 @@ export default function BotchatDashboard({
 
     return () => {
       clearTimeout(timeout);
-      abort.abort();
     };
   }, [messages]);
 
@@ -570,11 +606,7 @@ export default function BotchatDashboard({
               s.id === sessionIdAtSend
                 ? {
                     ...s,
-                    title:
-                      s.title === "New chat"
-                        ? previewText.slice(0, 60) || s.title
-                        : s.title,
-                    last_message: previewText.slice(0, 500),
+                    title: getOptimisticSessionTitle(s.title, previewText),
                     updated_at: now,
                   }
                 : s

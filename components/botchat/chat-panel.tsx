@@ -10,7 +10,7 @@ import type {
 } from "react";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import {
   Conversation,
   ConversationContent,
@@ -178,7 +178,8 @@ const MessageBubble = memo(function MessageBubble({
 }) {
   const text = messageText(message);
   const isUser = message.role === "user";
-  const canCopyResponse = !isUser && text.trim().length > 0;
+  const hasText = text.trim().length > 0;
+  const canCopyResponse = !isUser && hasText;
   const [copied, setCopied] = useState(false);
   const resetCopyStateTimeoutRef = useRef<number | null>(null);
   const parts = (message as UIMessage).parts ?? [];
@@ -215,6 +216,8 @@ const MessageBubble = memo(function MessageBubble({
       console.error("Failed to copy assistant response", error);
     }
   };
+
+  if (!hasText && fileParts.length === 0) return null;
 
   return (
     <div
@@ -443,8 +446,23 @@ export function ChatPanel({
   const lastMessageHasText = lastMessage
     ? messageText(lastMessage).trim().length > 0
     : false;
+  const lastUserIndex = messages.reduce(
+    (lastIndex, message, index) =>
+      message.role === "user" ? index : lastIndex,
+    -1
+  );
+  const hasAssistantTextAfterLastUser =
+    lastUserIndex >= 0 &&
+    messages
+      .slice(lastUserIndex + 1)
+      .some(
+        (message) =>
+          message.role === "assistant" &&
+          messageText(message).trim().length > 0
+      );
   const shouldShowThinking =
     status !== "ready" &&
+    !hasAssistantTextAfterLastUser &&
     (!!lastMessage &&
       (lastMessage.role === "user" ||
         (lastMessage.role === "assistant" && !lastMessageHasText)));
@@ -815,11 +833,9 @@ export function ChatPanel({
                   )
                 )}
 
-                <AnimatePresence initial={false}>
-                  {shouldShowThinking ? (
-                    <ThinkingBubble key="thinking" botInitials={botInitials} />
-                  ) : null}
-                </AnimatePresence>
+                {shouldShowThinking ? (
+                  <ThinkingBubble key="thinking" botInitials={botInitials} />
+                ) : null}
               </ConversationContent>
               <ConversationScrollButton className="bottom-5" />
             </Conversation>

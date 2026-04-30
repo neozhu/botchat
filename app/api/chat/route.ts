@@ -18,6 +18,8 @@ import {
 
 export const maxDuration = 30;
 
+const CONVERSATION_SUMMARY_MODEL_ID = "gpt-5.4-mini";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -149,10 +151,10 @@ export async function POST(request: Request) {
   const preparedContext = await prepareChatModelContext(messages as UIMessage[], {
     summarizeMessages: async (messagesToSummarize) => {
       const { text } = await generateText({
-        model: openai(getOpenAIModelId()),
+        model: openai(CONVERSATION_SUMMARY_MODEL_ID),
         providerOptions: {
           openai: {
-            reasoningEffort,
+            reasoningEffort: "none",
           },
         },
         system:

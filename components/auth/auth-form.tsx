@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowLeft, MailCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, MailCheck } from "lucide-react";
 import {
   signInAction,
   signUpAction,
@@ -116,7 +117,14 @@ export function AuthForm() {
             {currentScreen === "check-email" ? (
               <MailCheck className="h-5 w-5" />
             ) : (
-              <Sparkles className="h-5 w-5" />
+              <Image
+                src="/botchat-mark.svg"
+                alt="Botchat"
+                width={32}
+                height={32}
+                priority
+                className="h-8 w-8"
+              />
             )}
           </div>
         </div>

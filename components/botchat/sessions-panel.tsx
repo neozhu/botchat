@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { signOutAction } from "@/app/auth/actions";
 import { ChangePasswordDialog } from "@/components/botchat/change-password-dialog";
@@ -211,10 +212,23 @@ export function SessionsPanel({
     >
       <SidebarHeader className="gap-3 pb-2 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pb-0">
         <div className="flex items-center justify-between px-2.5 pt-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-          <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
-            <span className="font-[var(--font-display)] text-base font-semibold tracking-tight">
-              Sessions
-            </span>
+          <div className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:hidden">
+            <Image
+              src="/botchat-mark.svg"
+              alt=""
+              width={28}
+              height={28}
+              priority
+              className="h-7 w-7 shrink-0"
+            />
+            <div className="min-w-0">
+              <span className="block font-[var(--font-display)] text-sm leading-4 font-semibold tracking-tight">
+                Botchat
+              </span>
+              <span className="block text-[10px] leading-3 text-muted-foreground">
+                Sessions
+              </span>
+            </div>
             {isLoadingSessions ? (
               <Skeleton className="h-5 w-10 rounded-full bg-muted/60" />
             ) : (

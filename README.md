@@ -10,7 +10,7 @@ Built with **Next.js (App Router)** + **Vercel AI SDK** + **Supabase**.
 
 </div>
 
-![](/docs/screenshot.png)
+![](/public/botchat-community-share.png)
 
 ## What you get
 

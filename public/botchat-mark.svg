@@ -1,0 +1,31 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Botchat">
+  <defs>
+    <linearGradient id="botchat-mark-bg" x1="20" y1="14" x2="108" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B5CF6"/>
+      <stop offset="0.52" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="botchat-mark-line" x1="35" y1="38" x2="92" y2="87" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="1" stop-color="#C4B5FD"/>
+    </linearGradient>
+    <filter id="botchat-mark-shadow" x="14" y="15" width="103" height="105" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="6"/>
+      <feGaussianBlur stdDeviation="7"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.08 0 0 0 0 0.1 0 0 0 0 0.24 0 0 0 0.24 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+  <g filter="url(#botchat-mark-shadow)">
+    <path d="M22 44C22 30.7452 32.7452 20 46 20H82C95.2548 20 106 30.7452 106 44V70C106 83.2548 95.2548 94 82 94H66.5L45.5 108V94C32.4783 93.7327 22 83.0886 22 70V44Z" fill="url(#botchat-mark-bg)"/>
+    <path d="M42 57.5C50.5 43.5 75.5 43.5 84 57.5M42 70.5C50.5 84.5 75.5 84.5 84 70.5" stroke="url(#botchat-mark-line)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="42" cy="64" r="9" fill="#F8FAFC"/>
+    <circle cx="64" cy="64" r="9" fill="#F8FAFC"/>
+    <circle cx="86" cy="64" r="9" fill="#F8FAFC"/>
+    <circle cx="90" cy="39" r="6" fill="#F59E0B"/>
+  </g>
+</svg>

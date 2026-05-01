@@ -154,7 +154,7 @@ export async function POST(request: Request) {
         model: openai(CONVERSATION_SUMMARY_MODEL_ID),
         providerOptions: {
           openai: {
-            reasoningEffort: "none",
+            reasoningEffort: "minimal",
           },
         },
         system:

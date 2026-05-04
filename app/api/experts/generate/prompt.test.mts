@@ -60,6 +60,22 @@ test("buildExpertGenerationPrompt gives concise formatting rules instead of comp
   assert.match(prompt, /Ends with a single question mark/i);
 });
 
+test("buildExpertGenerationPrompt asks for GPT-5.5 outcome-first prompt sections", () => {
+  const prompt = buildExpertGenerationPrompt({
+    name: "Research Partner",
+    agentName: "Mira",
+    description: "Helps product teams synthesize customer interviews into roadmap evidence.",
+    languageHint: "English",
+  });
+
+  assert.match(prompt, /target outcome/i);
+  assert.match(prompt, /success criteria/i);
+  assert.match(prompt, /required constraints/i);
+  assert.match(prompt, /available evidence or context/i);
+  assert.match(prompt, /final output should contain/i);
+  assert.match(prompt, /stop rules/i);
+});
+
 test("buildExpertGenerationPrompt handles weak ordinary-user persona input", () => {
   const prompt = buildExpertGenerationPrompt({
     name: "写作助手",

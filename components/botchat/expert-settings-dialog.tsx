@@ -998,7 +998,13 @@ export function ExpertSettingsDialog({
                   </div>
 
                   <div className="mt-2.5 space-y-1">
-                    <p className="text-[11px] font-medium text-muted-foreground">Description</p>
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground">Description</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Prompt should clarify the target outcome, required constraints, available evidence or
+                        context, required final output, and when to stop or ask follow-up questions.
+                      </p>
+                    </div>
                     <Textarea
                       value={draft.description}
                       onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}

@@ -12,12 +12,18 @@ import {
   useRef,
   useState,
 } from "react";
-import { type BundledLanguage, codeToHtml, type ShikiTransformer } from "shiki";
+import {
+  type BundledLanguage,
+  bundledLanguages,
+  codeToHtml,
+  type ShikiTransformer,
+} from "shiki";
 
 type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   code: string;
-  language: BundledLanguage;
+  language: string;
   showLineNumbers?: boolean;
+  themeMode?: "system" | "dark";
 };
 
 type CodeBlockContextType = {
@@ -51,21 +57,23 @@ const lineNumberTransformer: ShikiTransformer = {
 
 export async function highlightCode(
   code: string,
-  language: BundledLanguage,
+  language: string,
   showLineNumbers = false
 ) {
   const transformers: ShikiTransformer[] = showLineNumbers
     ? [lineNumberTransformer]
     : [];
+  const highlightedLanguage =
+    language in bundledLanguages ? (language as BundledLanguage) : "text";
 
   return await Promise.all([
     codeToHtml(code, {
-      lang: language,
+      lang: highlightedLanguage as BundledLanguage,
       theme: "one-light",
       transformers,
     }),
     codeToHtml(code, {
-      lang: language,
+      lang: highlightedLanguage as BundledLanguage,
       theme: "one-dark-pro",
       transformers,
     }),
@@ -76,25 +84,28 @@ export const CodeBlock = ({
   code,
   language,
   showLineNumbers = false,
+  themeMode = "system",
   className,
   children,
   ...props
 }: CodeBlockProps) => {
   const [html, setHtml] = useState<string>("");
   const [darkHtml, setDarkHtml] = useState<string>("");
-  const mounted = useRef(false);
+  const requestId = useRef(0);
 
   useEffect(() => {
+    const currentRequestId = requestId.current + 1;
+    requestId.current = currentRequestId;
+
     highlightCode(code, language, showLineNumbers).then(([light, dark]) => {
-      if (!mounted.current) {
+      if (requestId.current === currentRequestId) {
         setHtml(light);
         setDarkHtml(dark);
-        mounted.current = true;
       }
     });
 
     return () => {
-      mounted.current = false;
+      requestId.current += 1;
     };
   }, [code, language, showLineNumbers]);
 
@@ -108,13 +119,20 @@ export const CodeBlock = ({
         {...props}
       >
         <div className="relative">
+          {themeMode === "system" ? (
+            <div
+              className="overflow-auto dark:hidden [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          ) : null}
           <div
-            className="overflow-auto dark:hidden [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
-          <div
-            className="hidden overflow-auto dark:block [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm"
+            className={cn(
+              "overflow-auto [&>pre]:m-0 [&>pre]:p-4 [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm",
+              themeMode === "system"
+                ? "hidden dark:block [&>pre]:bg-background! [&>pre]:text-foreground!"
+                : "[&>pre]:bg-transparent!"
+            )}
             // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
             dangerouslySetInnerHTML={{ __html: darkHtml }}
           />

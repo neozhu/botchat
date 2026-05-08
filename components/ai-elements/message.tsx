@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { CodeBlock, CodeBlockCopyButton } from "@/components/ai-elements/code-block";
 import {
   ButtonGroup,
   ButtonGroupText,
@@ -19,8 +20,20 @@ import {
   PaperclipIcon,
   XIcon,
 } from "lucide-react";
-import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
-import { createContext, memo, useContext, useEffect, useState } from "react";
+import type {
+  ComponentProps,
+  HTMLAttributes,
+  ReactElement,
+  ReactNode,
+} from "react";
+import {
+  createContext,
+  isValidElement,
+  memo,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { Streamdown } from "streamdown";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
@@ -306,15 +319,90 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
+type MarkdownCodeProps = ComponentProps<"code"> & {
+  node?: {
+    position?: {
+      start?: { line?: number };
+      end?: { line?: number };
+    };
+  };
+};
+
+const codeLanguagePattern = /language-([^\s]+)/;
+
+function childrenToString(children: ReactNode): string {
+  if (typeof children === "string") {
+    return children;
+  }
+
+  if (typeof children === "number") {
+    return String(children);
+  }
+
+  if (Array.isArray(children)) {
+    return children.map(childrenToString).join("");
+  }
+
+  if (
+    isValidElement<{ children?: ReactNode }>(children) &&
+    children.props.children
+  ) {
+    return childrenToString(children.props.children);
+  }
+
+  return "";
+}
+
+const MarkdownCode = ({
+  children,
+  className,
+  node,
+  ...props
+}: MarkdownCodeProps) => {
+  const code = childrenToString(children).replace(/\n$/, "");
+  const language = className?.match(codeLanguagePattern)?.[1] ?? "text";
+  const isInline =
+    node?.position?.start?.line === node?.position?.end?.line &&
+    !code.includes("\n");
+
+  if (isInline) {
+    return (
+      <code
+        className={cn("rounded bg-muted px-1.5 py-0.5 font-mono text-sm", className)}
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  }
+
+  return (
+    <CodeBlock
+      className="my-4 rounded-xl border-white/25 bg-[linear-gradient(135deg,rgba(8,6,28,0.48),rgba(7,10,30,0.62)),linear-gradient(135deg,var(--bot-gradient-start),var(--bot-gradient-end))] text-white shadow-[0_18px_42px_-20px_rgba(9,8,35,0.88)]"
+      code={code}
+      data-language={language}
+      data-streamdown="code-block"
+      language={language}
+      themeMode="dark"
+      {...props}
+    >
+      <CodeBlockCopyButton className="text-white/75 hover:text-white" />
+    </CodeBlock>
+  );
+};
+
+const MarkdownPre = ({ children }: ComponentProps<"pre">) => children;
+
 export const MessageResponse = memo(
-  ({ className, ...props }: MessageResponseProps) => (
+  ({ className, components, ...props }: MessageResponseProps) => (
     <Streamdown
+      cdnUrl={null}
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         "[&_[data-streamdown=code-block]]:border-white/25 [&_[data-streamdown=code-block]]:bg-[linear-gradient(135deg,rgba(8,6,28,0.48),rgba(7,10,30,0.62)),linear-gradient(135deg,var(--bot-gradient-start),var(--bot-gradient-end))] [&_[data-streamdown=code-block]]:text-white [&_[data-streamdown=code-block]]:shadow-[0_18px_42px_-20px_rgba(9,8,35,0.88)]",
         "[&_[data-streamdown=code-block-header]]:border-b [&_[data-streamdown=code-block-header]]:border-white/20 [&_[data-streamdown=code-block-header]]:bg-black/25 [&_[data-streamdown=code-block-header]]:text-white/80",
         "[&_[data-streamdown=code-block-header]_button]:text-white/75 [&_[data-streamdown=code-block-header]_button:hover]:text-white",
-        "[&_[data-streamdown=code-block-body]]:!bg-transparent [&_[data-streamdown=code-block-body]]:!text-white [&_[data-streamdown=code-block-body]_*]:!text-white",
+        "[&_[data-streamdown=code-block-body]]:!bg-transparent [&_[data-streamdown=code-block-body]]:!text-white",
         "[&_[data-streamdown=table-wrapper]]:gap-0 [&_[data-streamdown=table-wrapper]]:text-white [&_[data-streamdown=table-wrapper]>:not(:last-child)]:!mb-0.5",
         "[&_[data-streamdown=table-wrapper]>div:last-child]:rounded-xl [&_[data-streamdown=table-wrapper]>div:last-child]:border [&_[data-streamdown=table-wrapper]>div:last-child]:border-white/20 [&_[data-streamdown=table-wrapper]>div:last-child]:bg-[linear-gradient(135deg,rgba(8,6,28,0.42),rgba(7,10,30,0.58)),linear-gradient(135deg,var(--bot-gradient-start),var(--bot-gradient-end))] [&_[data-streamdown=table-wrapper]>div:last-child]:shadow-[0_18px_42px_-22px_rgba(9,8,35,0.82)]",
         "[&_table[data-streamdown=table-wrapper]]:border-0",
@@ -330,6 +418,11 @@ export const MessageResponse = memo(
         "[&_[data-streamdown=table-wrapper]>div:first-child>div>div_button:hover]:text-foreground",
         className
       )}
+      components={{
+        code: MarkdownCode,
+        pre: MarkdownPre,
+        ...components,
+      }}
       {...props}
     />
   ),

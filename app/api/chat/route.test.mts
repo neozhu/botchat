@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 test("conversation summary uses the fast mini model with reasoning disabled", () => {
   const routeSource = readFileSync(
-    fileURLToPath(new URL("./route.ts", import.meta.url)),
+    fileURLToPath(new URL("../../../lib/botchat/chat-stream.ts", import.meta.url)),
     "utf8"
   );
 
@@ -19,6 +19,16 @@ test("conversation summary uses the fast mini model with reasoning disabled", ()
   );
   assert.match(
     routeSource,
-    /summarizeMessages:[\s\S]*reasoningEffort:\s*"none"/
+    /summarizeMessages:[\s\S]*reasoningEffort:\s*"minimal"/
   );
+});
+
+test("chat route returns an AI SDK UI message stream response", () => {
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("../../../lib/botchat/chat-stream.ts", import.meta.url)),
+    "utf8"
+  );
+
+  assert.match(routeSource, /streamText\(/);
+  assert.match(routeSource, /return\s+result\.toUIMessageStreamResponse\(\)/);
 });

@@ -306,8 +306,111 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
+type MarkdownExtraProps = {
+  node?: unknown;
+};
+
+function LightweightPre({ children }: ComponentProps<"pre"> & MarkdownExtraProps) {
+  return <>{children}</>;
+}
+
+function LightweightCode({
+  className,
+  children,
+  node: _node,
+  ...props
+}: ComponentProps<"code"> & MarkdownExtraProps) {
+  const isBlock = className?.includes("language-");
+
+  if (!isBlock) {
+    return (
+      <code
+        className={cn("rounded-md px-1.5 py-0.5 font-mono text-[0.92em]", className)}
+        data-botchat-markdown="inline-code"
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  }
+
+  return (
+    <pre
+      className="my-3 max-w-full overflow-x-auto rounded-xl border border-white/15 bg-black/20 p-4 text-sm leading-relaxed"
+      data-botchat-markdown="code-block"
+    >
+      <code
+        className={cn("font-mono text-sm", className)}
+        data-botchat-markdown="code"
+        {...props}
+      >
+        {children}
+      </code>
+    </pre>
+  );
+}
+
+function LightweightTable({
+  className,
+  children,
+  node: _node,
+  ...props
+}: ComponentProps<"table"> & MarkdownExtraProps) {
+  return (
+    <div
+      className="my-4 max-w-full overflow-x-auto rounded-xl border border-white/15"
+      data-botchat-markdown="table-wrapper"
+    >
+      <table
+        className={cn("w-full min-w-max border-collapse text-sm", className)}
+        data-botchat-markdown="table"
+        {...props}
+      >
+        {children}
+      </table>
+    </div>
+  );
+}
+
+function LightweightTh({
+  className,
+  node: _node,
+  ...props
+}: ComponentProps<"th"> & MarkdownExtraProps) {
+  return (
+    <th
+      className={cn(
+        "border-b border-white/15 bg-white/10 px-3 py-2 text-left font-semibold",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+function LightweightTd({
+  className,
+  node: _node,
+  ...props
+}: ComponentProps<"td"> & MarkdownExtraProps) {
+  return (
+    <td
+      className={cn("border-t border-white/10 px-3 py-2 align-top", className)}
+      {...props}
+    />
+  );
+}
+
+const optimizedMarkdownComponents: NonNullable<MessageResponseProps["components"]> = {
+  code: LightweightCode,
+  pre: LightweightPre,
+  table: LightweightTable,
+  th: LightweightTh,
+  td: LightweightTd,
+};
+
 export const MessageResponse = memo(
-  ({ className, ...props }: MessageResponseProps) => (
+  ({ className, components: _components, controls: _controls, ...props }: MessageResponseProps) => (
     <Streamdown
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
@@ -316,6 +419,8 @@ export const MessageResponse = memo(
         "[&_[data-streamdown=code-block-body]]:!bg-transparent [&_[data-streamdown=code-block-body]]:!text-foreground",
         className
       )}
+      components={optimizedMarkdownComponents}
+      controls={{ code: false, table: false, mermaid: false }}
       {...props}
     />
   ),

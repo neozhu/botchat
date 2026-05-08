@@ -124,6 +124,7 @@ export default function BotchatDashboardClient({
   const { messages, sendMessage, status, setMessages, stop } = useChat({
     id: activeSessionId ?? "new",
     messages: chatBootstrapMessages,
+    experimental_throttle: 80,
     transport: new DefaultChatTransport({ api: "/chat/stream" }),
     onFinish: ({ message }) => {
       const targetSessionId =
@@ -440,7 +441,9 @@ export default function BotchatDashboardClient({
     const lastAssistant =
       [...messages].reverse().find((m) => m.role === "assistant") ?? null;
     const assistantNeedsUpdate =
-      lastAssistant && savedIds.has(lastAssistant.id) ? lastAssistant : null;
+      status === "ready" && lastAssistant && savedIds.has(lastAssistant.id)
+        ? lastAssistant
+        : null;
 
     const toUpsert = [
       ...newMessages,
@@ -503,7 +506,7 @@ export default function BotchatDashboardClient({
     return () => {
       clearTimeout(timeout);
     };
-  }, [messages]);
+  }, [messages, status]);
 
   const uploadAttachments = async (
     sessionId: string,

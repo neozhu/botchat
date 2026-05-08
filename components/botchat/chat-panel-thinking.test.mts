@@ -16,3 +16,21 @@ test("chat panel hides thinking placeholder once assistant text exists after the
   );
   assert.match(source, /!\s*hasAssistantTextAfterLastUser/);
 });
+
+test("streaming assistant messages use lightweight text before markdown rendering", () => {
+  assert.match(source, /isStreaming\s*:\s*boolean/);
+  assert.match(source, /isStreaming\s*&&\s*!\s*isUser/);
+  assert.match(source, /whitespace-pre-wrap/);
+  assert.match(source, /<MessageResponse/);
+  assert.match(source, /isStreaming=\{[\s\S]*status !== "ready"[\s\S]*lastMessage\?\.id/);
+});
+
+test("conversation scroll avoids smooth resize work during streaming", () => {
+  const conversationSource = readFileSync(
+    new URL("../ai-elements/conversation.tsx", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(conversationSource, /initial="instant"/);
+  assert.match(conversationSource, /resize="instant"/);
+});

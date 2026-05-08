@@ -311,9 +311,23 @@ export const MessageResponse = memo(
     <Streamdown
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-        "[&_[data-streamdown=code-block]]:bg-background [&_[data-streamdown=code-block]]:text-foreground",
-        "[&_[data-streamdown=code-block-header]]:bg-muted [&_[data-streamdown=code-block-header]]:border-b [&_[data-streamdown=code-block-header]]:border-border",
-        "[&_[data-streamdown=code-block-body]]:!bg-transparent [&_[data-streamdown=code-block-body]]:!text-foreground",
+        "[&_[data-streamdown=code-block]]:border-white/25 [&_[data-streamdown=code-block]]:bg-[linear-gradient(135deg,rgba(8,6,28,0.48),rgba(7,10,30,0.62)),linear-gradient(135deg,var(--bot-gradient-start),var(--bot-gradient-end))] [&_[data-streamdown=code-block]]:text-white [&_[data-streamdown=code-block]]:shadow-[0_18px_42px_-20px_rgba(9,8,35,0.88)]",
+        "[&_[data-streamdown=code-block-header]]:border-b [&_[data-streamdown=code-block-header]]:border-white/20 [&_[data-streamdown=code-block-header]]:bg-black/25 [&_[data-streamdown=code-block-header]]:text-white/80",
+        "[&_[data-streamdown=code-block-header]_button]:text-white/75 [&_[data-streamdown=code-block-header]_button:hover]:text-white",
+        "[&_[data-streamdown=code-block-body]]:!bg-transparent [&_[data-streamdown=code-block-body]]:!text-white [&_[data-streamdown=code-block-body]_*]:!text-white",
+        "[&_[data-streamdown=table-wrapper]]:gap-0 [&_[data-streamdown=table-wrapper]]:text-white [&_[data-streamdown=table-wrapper]>:not(:last-child)]:!mb-0.5",
+        "[&_[data-streamdown=table-wrapper]>div:last-child]:rounded-xl [&_[data-streamdown=table-wrapper]>div:last-child]:border [&_[data-streamdown=table-wrapper]>div:last-child]:border-white/20 [&_[data-streamdown=table-wrapper]>div:last-child]:bg-[linear-gradient(135deg,rgba(8,6,28,0.42),rgba(7,10,30,0.58)),linear-gradient(135deg,var(--bot-gradient-start),var(--bot-gradient-end))] [&_[data-streamdown=table-wrapper]>div:last-child]:shadow-[0_18px_42px_-22px_rgba(9,8,35,0.82)]",
+        "[&_table[data-streamdown=table-wrapper]]:border-0",
+        "[&_[data-streamdown=table]]:border-0 [&_[data-streamdown=table]]:text-white",
+        "[&_[data-streamdown=table-header]]:bg-black/25",
+        "[&_[data-streamdown=table-body]]:divide-white/12 [&_[data-streamdown=table-body]]:bg-white/5",
+        "[&_[data-streamdown=table-row]]:border-white/12",
+        "[&_[data-streamdown=table-header-cell]]:text-white/90",
+        "[&_[data-streamdown=table-cell]]:text-white/85",
+        "[&_[data-streamdown=table-wrapper]>div:first-child>div>button]:text-white/75",
+        "[&_[data-streamdown=table-wrapper]>div:first-child>div>button:hover]:text-white",
+        "[&_[data-streamdown=table-wrapper]>div:first-child>div>div_button]:text-foreground",
+        "[&_[data-streamdown=table-wrapper]>div:first-child>div>div_button:hover]:text-foreground",
         className
       )}
       {...props}

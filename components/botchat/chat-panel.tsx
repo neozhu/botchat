@@ -254,7 +254,7 @@ const MessageBubble = memo(function MessageBubble({
                   "text-sm leading-relaxed",
                   "[&_a]:underline [&_a]:underline-offset-4",
                   "[&_:not(pre)>code]:rounded-md [&_:not(pre)>code]:px-1.5 [&_:not(pre)>code]:py-0.5",
-                  "[&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:p-4",
+                  "[&_pre]:overflow-x-auto [&_pre]:p-4",
                   "[&_img]:max-w-full [&_img]:rounded-2xl [&_img]:border",
                   "[&_ul]:mb-2 [&_ul]:space-y-0 [&_ul]:pl-0 [&_ul]:list-none",
                   "[&_ul>li]:relative [&_ul>li]:pl-6",

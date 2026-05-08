@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { signOutAction } from "@/app/auth/actions";
+import { searchSessionsAction } from "@/app/botchat/actions";
 import { ChangePasswordDialog } from "@/components/botchat/change-password-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -113,18 +114,17 @@ export function SessionsPanel({
     const timeout = setTimeout(() => {
       void (async () => {
         try {
-          const response = await fetch(
-            `/api/sessions/search?q=${encodeURIComponent(normalizedQuery)}`,
-            { signal: abort.signal }
-          );
+          if (abort.signal.aborted) return;
 
-          if (!response.ok) {
-            console.error("Failed to search sessions", await response.text());
+          const payload = await searchSessionsAction(normalizedQuery);
+          if (abort.signal.aborted) return;
+
+          if (!payload.ok) {
+            console.error("Failed to search sessions", payload.error);
             setSearchResults([]);
             return;
           }
 
-          const payload = (await response.json()) as { sessions?: SessionItem[] };
           setSearchResults(Array.isArray(payload.sessions) ? payload.sessions : []);
         } catch (error) {
           if ((error as { name?: string }).name === "AbortError") return;

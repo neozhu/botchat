@@ -41,6 +41,13 @@ import {
   getExpertListDropResult,
 } from "@/lib/botchat/expert-list-sortable";
 import type { ExpertRow } from "@/lib/botchat/types";
+import {
+  deleteExpertAction,
+  generateExpertPromptAction,
+  loadExpertsAction,
+  reorderExpertsAction,
+  saveExpertAction,
+} from "@/app/botchat/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -421,18 +428,14 @@ export function ExpertSettingsDialog({
   const loadExperts = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    const response = await fetch("/api/experts");
+    const payload = await loadExpertsAction();
 
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
+    if (!payload.ok) {
       setIsLoading(false);
-      setError(body?.error || "Failed to load experts.");
+      setError(payload.error || "Failed to load experts.");
       return;
     }
 
-    const payload = (await response.json()) as { experts?: ExpertRow[] };
     const rows = Array.isArray(payload.experts) ? payload.experts : [];
     syncExperts(rows);
     onExpertsUpdated?.(rows);
@@ -445,26 +448,18 @@ export function ExpertSettingsDialog({
       setError(null);
 
       try {
-        const response = await fetch("/api/experts/reorder", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            items: nextExperts.map((expert) => ({
-              id: expert.id,
-              sort_order: expert.sort_order,
-            })),
-          }),
-        });
+        const payload = await reorderExpertsAction(
+          nextExperts.map((expert) => ({
+            id: expert.id,
+            sort_order: expert.sort_order,
+          }))
+        );
 
-        if (!response.ok) {
-          const body = (await response.json().catch(() => null)) as
-            | { error?: string }
-            | null;
-          setError(body?.error || "Failed to reorder experts.");
+        if (!payload.ok) {
+          setError(payload.error || "Failed to reorder experts.");
           return false;
         }
 
-        const payload = (await response.json()) as { experts?: ExpertRow[] };
         const rows = Array.isArray(payload.experts) ? payload.experts : nextExperts;
         updateExperts(rows);
         onExpertsUpdated?.(rows);
@@ -586,23 +581,15 @@ export function ExpertSettingsDialog({
 
       setDraft((prev) => ({ ...prev, slug: payload.slug, sort_order: payload.sort_order }));
 
-      const response = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          id: draft.id,
-          ...payload,
-        }),
+      const result = await saveExpertAction({
+        id: draft.id,
+        ...payload,
       });
 
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-        throw new Error(body?.error || "Failed to save expert.");
+      if (!result.ok) {
+        throw new Error(result.error || "Failed to save expert.");
       }
 
-      const result = (await response.json()) as { experts?: ExpertRow[] };
       const nextExperts = Array.isArray(result.experts) ? result.experts : [];
       updateExperts(nextExperts);
       onExpertsUpdated?.(nextExperts);
@@ -655,22 +642,11 @@ export function ExpertSettingsDialog({
     setIsDeleting(true);
     setError(null);
     try {
-      const response = await fetch("/api/experts/delete", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: selected.id }),
-      });
+      const result = await deleteExpertAction(selected.id);
 
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-        throw new Error(body?.error || (await response.text()));
+      if (!result.ok) {
+        throw new Error(result.error || "Failed to delete expert.");
       }
-      const result = (await response.json()) as {
-        experts?: ExpertRow[];
-        deletedSessionIds?: string[];
-      };
       const nextExperts = Array.isArray(result.experts) ? result.experts : [];
       const deletedSessionIds = Array.isArray(result.deletedSessionIds)
         ? result.deletedSessionIds.filter((sessionId): sessionId is string => typeof sessionId === "string")
@@ -703,21 +679,17 @@ export function ExpertSettingsDialog({
     setIsGenerating(true);
     setError(null);
     try {
-      const response = await fetch("/api/experts/generate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name: draft.name,
-          agent_name: draft.agent_name,
-          description: draft.description,
-        }),
+      const result = await generateExpertPromptAction({
+        name: draft.name,
+        agent_name: draft.agent_name,
+        description: draft.description,
       });
 
-      if (!response.ok) {
-        throw new Error(await response.text());
+      if (!result.ok) {
+        throw new Error(result.error || "Failed to generate with AI.");
       }
 
-      const parsed = expertGenerationSchema.safeParse(await response.json());
+      const parsed = expertGenerationSchema.safeParse(result);
       if (!parsed.success) {
         throw new Error("Invalid AI response.");
       }

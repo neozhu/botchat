@@ -2,7 +2,7 @@ import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { getOpenAIModelId } from "@/lib/ai/openai";
 import { z } from "zod";
-import { buildExpertGenerationPrompt } from "./prompt";
+import { buildExpertGenerationPrompt } from "@/lib/botchat/expert-generation-prompt";
 
 export const maxDuration = 30;
 

@@ -201,7 +201,7 @@ export default function BotchatDashboard({
   const botName = activeExpert?.agent_name ?? "Kate";
   const botInitials = initialsFromName(botName);
   const suggestionText =
-    activeExpert?.suggestion_question ?? "What should the assistant ask next?";
+    activeExpert?.suggestion_question ?? "What should I ask this expert first?";
   const isLoadingExperts = false;
   const isLoadingSessions = false;
 

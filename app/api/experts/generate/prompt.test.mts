@@ -60,6 +60,18 @@ test("buildExpertGenerationPrompt gives concise formatting rules instead of comp
   assert.match(prompt, /Ends with a single question mark/i);
 });
 
+test("buildExpertGenerationPrompt defines suggestion_question as the user's first question", () => {
+  const prompt = buildExpertGenerationPrompt({
+    name: "Salesforce Architect",
+    agentName: "Richard",
+    description: "Helps users analyze Salesforce demands.",
+    languageHint: "English",
+  });
+
+  assert.match(prompt, /user's first question to the AI/i);
+  assert.match(prompt, /not the AI's opening line/i);
+});
+
 test("buildExpertGenerationPrompt asks for GPT-5.5 outcome-first prompt sections", () => {
   const prompt = buildExpertGenerationPrompt({
     name: "Research Partner",

@@ -8,7 +8,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -449,6 +454,10 @@ export function SessionsPanel({
           className="gap-3 overflow-hidden p-0 sm:max-w-2xl"
         >
           <DialogTitle className="sr-only">Search chat history</DialogTitle>
+          <DialogDescription className="sr-only">
+            Search existing chat sessions by title or latest message, then select
+            one to open it.
+          </DialogDescription>
           <div className="flex items-center gap-2 border-b px-4 py-3">
             <Search className="h-4 w-4 text-muted-foreground" />
             <Input

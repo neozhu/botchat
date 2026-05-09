@@ -62,6 +62,7 @@ export type SessionsPanelProps = {
   removingSessionIds: Set<string>;
   nowMs: number;
   onSelectSession: (session: SessionItem) => void | Promise<void>;
+  onPrefetchSession?: (session: SessionItem) => void;
   onDeleteSession: (session: SessionItem) => void | Promise<void>;
   onCreateSession: () => void | Promise<void>;
   formatRelativeTime: (thenIso: string, nowMs: number) => string;
@@ -82,6 +83,7 @@ export function SessionsPanel({
   removingSessionIds,
   nowMs,
   onSelectSession,
+  onPrefetchSession,
   onDeleteSession,
   onCreateSession,
   formatRelativeTime,
@@ -300,6 +302,8 @@ export function SessionsPanel({
                           if (isMobile) setOpenMobile(false);
                         })();
                       }}
+                      onFocus={() => onPrefetchSession?.(item)}
+                      onMouseEnter={() => onPrefetchSession?.(item)}
                     >
                       <Avatar className="h-7 w-7 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
                         <AvatarFallback className="bg-[var(--user-bubble)] text-[10px] font-semibold group-data-[collapsible=icon]:text-xs">
@@ -515,6 +519,8 @@ export function SessionsPanel({
                               ? "bg-accent"
                               : "hover:bg-accent/70"
                           )}
+                          onFocus={() => onPrefetchSession?.(session)}
+                          onMouseEnter={() => onPrefetchSession?.(session)}
                           onClick={() => handleSelectFromSearch(session)}
                         >
                           <span className="w-full truncate text-[13px] font-medium">

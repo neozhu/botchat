@@ -53,6 +53,7 @@ import {
   Copy,
   Globe,
   Info,
+  Loader2,
   MessageCircle,
   Mic,
   MoreHorizontal,
@@ -97,6 +98,7 @@ export type ChatPanelProps = {
   messages: UIMessage[];
   messageTimestamps: Record<string, string>;
   status: string;
+  isLoadingSessionMessages?: boolean;
   input: string;
   setInput: (value: string) => void;
   isHighReasoning: boolean;
@@ -398,6 +400,7 @@ export function ChatPanel({
   messages,
   messageTimestamps,
   status,
+  isLoadingSessionMessages,
   input,
   setInput,
   isHighReasoning,
@@ -440,7 +443,8 @@ export function ChatPanel({
     };
   }, [previews]);
 
-  const canSend = status === "ready" && !isUploadingAttachments;
+  const canSend =
+    status === "ready" && !isUploadingAttachments && !isLoadingSessionMessages;
   const showPromptSuggestion = messages.length === 0;
   const lastMessage = messages[messages.length - 1];
   const lastMessageHasText = lastMessage
@@ -804,6 +808,13 @@ export function ChatPanel({
                   </Button>
                   <span className="absolute -left-5 top-4 h-px w-5 bg-[var(--accent-line-soft)]" />
                 </div>
+              </div>
+            ) : null}
+
+            {isLoadingSessionMessages ? (
+              <div className="pointer-events-none absolute top-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/70 bg-white/90 px-3 py-1.5 text-xs text-muted-foreground shadow-[0_12px_28px_-18px_rgba(20,20,60,0.35)] backdrop-blur">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Loading chat...</span>
               </div>
             ) : null}
 

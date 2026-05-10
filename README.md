@@ -80,6 +80,7 @@ This repo includes a production Docker build for the Next.js app:
 docker compose up -d --build
 ```
 
+
 App is exposed at `http://localhost:3202` (mapped from container `3000`).
 
 Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in your deployment platform or `docker-compose.yml`.

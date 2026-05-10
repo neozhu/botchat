@@ -6,3 +6,6 @@ export function getOpenAIModelId() {
   return model;
 }
 
+export function getConversationSummaryModelId() {
+  return process.env.OPENAI_CONVERSATION_SUMMARY_MODEL?.trim() || getOpenAIModelId();
+}

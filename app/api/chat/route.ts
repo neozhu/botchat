@@ -10,15 +10,16 @@ import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { normalizeReasoningEffort } from "@/lib/ai/reasoning-effort";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getOpenAIModelId } from "@/lib/ai/openai";
+import {
+  getConversationSummaryModelId,
+  getOpenAIModelId,
+} from "@/lib/ai/openai";
 import {
   buildConversationSummaryPrompt,
   prepareChatModelContext,
 } from "@/lib/botchat/chat-context";
 
 export const maxDuration = 30;
-
-const CONVERSATION_SUMMARY_MODEL_ID = "gpt-5.4-mini";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -151,7 +152,7 @@ export async function POST(request: Request) {
   const preparedContext = await prepareChatModelContext(messages as UIMessage[], {
     summarizeMessages: async (messagesToSummarize) => {
       const { text } = await generateText({
-        model: openai(CONVERSATION_SUMMARY_MODEL_ID),
+        model: openai(getConversationSummaryModelId()),
         providerOptions: {
           openai: {
             reasoningEffort: "minimal",

@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 export const RECENT_CHAT_MESSAGE_COUNT = 5;
 export const MAX_CHAT_CONTEXT_TOKENS = 5_000;
 export const FALLBACK_RECENT_CHAT_MESSAGE_COUNT = 2;
+export const COMPACT_AFTER_USER_MESSAGE_COUNT = 4;
 
 const APPROX_CHARS_PER_TOKEN = 4;
 
@@ -10,6 +11,7 @@ type PrepareChatModelContextOptions = {
   recentMessageCount?: number;
   maxContextTokens?: number;
   fallbackRecentMessageCount?: number;
+  compactAfterUserMessageCount?: number;
   estimateTokens?: (messages: UIMessage[]) => number;
   summarizeMessages?: (messages: UIMessage[]) => Promise<string>;
 };
@@ -55,6 +57,10 @@ export function estimateMessagesTokens(messages: UIMessage[]): number {
   return Math.ceil(serializedChars / APPROX_CHARS_PER_TOKEN) + messages.length * 4;
 }
 
+function countUserMessages(messages: UIMessage[]): number {
+  return messages.filter((message) => message.role === "user").length;
+}
+
 export function buildConversationSummaryPrompt(messages: UIMessage[]): string {
   const transcript = messages
     .map((message, index) => {
@@ -85,28 +91,36 @@ export async function prepareChatModelContext(
   const maxContextTokens = options.maxContextTokens ?? MAX_CHAT_CONTEXT_TOKENS;
   const fallbackRecentMessageCount =
     options.fallbackRecentMessageCount ?? FALLBACK_RECENT_CHAT_MESSAGE_COUNT;
+  const compactAfterUserMessageCount =
+    options.compactAfterUserMessageCount ?? COMPACT_AFTER_USER_MESSAGE_COUNT;
   const estimateTokens = options.estimateTokens ?? estimateMessagesTokens;
 
-  const recentMessages = messages.slice(-recentMessageCount);
-  const estimatedTokens = estimateTokens(recentMessages);
+  const estimatedTokens = estimateTokens(messages);
+  const shouldCompactByUserMessageCount =
+    countUserMessages(messages) >= compactAfterUserMessageCount;
 
-  if (estimatedTokens <= maxContextTokens) {
+  if (estimatedTokens <= maxContextTokens && !shouldCompactByUserMessageCount) {
     return {
-      messages: recentMessages,
+      messages,
       estimatedTokens,
       compacted: false,
     };
   }
 
-  const fallbackMessages = messages.slice(-fallbackRecentMessageCount);
+  const recentMessages = messages.slice(-recentMessageCount);
+  const recentEstimatedTokens = estimateTokens(recentMessages);
+  const retainedMessages =
+    recentEstimatedTokens <= maxContextTokens
+      ? recentMessages
+      : messages.slice(-fallbackRecentMessageCount);
   const messagesToSummarize = messages.slice(
     0,
-    Math.max(0, messages.length - fallbackMessages.length)
+    Math.max(0, messages.length - retainedMessages.length)
   );
 
   if (!options.summarizeMessages || messagesToSummarize.length === 0) {
     return {
-      messages: fallbackMessages,
+      messages: retainedMessages,
       estimatedTokens,
       compacted: true,
     };
@@ -120,7 +134,7 @@ export async function prepareChatModelContext(
   }
 
   return {
-    messages: fallbackMessages,
+    messages: retainedMessages,
     systemContext: summary
       ? `Conversation summary before the latest messages:\n${summary}`
       : undefined,

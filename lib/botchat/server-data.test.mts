@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { shouldSeedExperts } from "./expert-seeding.ts";
 
 test("does not seed experts for unauthenticated requests", () => {
@@ -37,4 +39,22 @@ test("does not seed experts when authenticated requests already have all seed sl
     ]),
     false
   );
+});
+
+test("session search uses only session-level fields including context summary", () => {
+  const source = readFileSync(
+    fileURLToPath(new URL("./server-data.ts", import.meta.url)),
+    "utf8"
+  );
+  const searchFunction = source.slice(
+    source.indexOf("export async function searchSessions"),
+    source.indexOf("export const loadMessagesForSession")
+  );
+
+  assert.match(searchFunction, /context_summary/);
+  assert.match(
+    searchFunction,
+    /title\.ilike\.\$\{like\},last_message\.ilike\.\$\{like\},context_summary\.ilike\.\$\{like\}/
+  );
+  assert.doesNotMatch(searchFunction, /\.from\("chat_messages"\)/);
 });

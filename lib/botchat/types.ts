@@ -17,6 +17,7 @@ export type SessionRow = {
   expert_id: string;
   title: string;
   last_message: string | null;
+  context_summary?: string | null;
   created_at: string;
   updated_at: string;
 };

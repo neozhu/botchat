@@ -21,3 +21,39 @@ test("message sync summarizes every first user title with the fast mini model", 
   assert.match(routeSource, /reasoningEffort:\s*"none"/);
   assert.match(routeSource, /session:\s*{\s*id:\s*sessionId,\s*\.\.\.update\s*}/);
 });
+
+test("message sync persists rolling conversation summaries after message upsert", () => {
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("./route.ts", import.meta.url)),
+    "utf8"
+  );
+
+  assert.match(
+    routeSource,
+    /getConversationSummaryModelId/
+  );
+  assert.match(
+    routeSource,
+    /buildRollingConversationSummaryPrompt/
+  );
+  assert.match(
+    routeSource,
+    /selectMessagesForPersistentSummary/
+  );
+  assert.match(
+    routeSource,
+    /\.select\("id, context_summary"\)[\s\S]*\.from\("chat_messages"\)[\s\S]*\.is\("summarized_at", null\)/
+  );
+  assert.match(
+    routeSource,
+    /context_summary:\s*summary/
+  );
+  assert.match(
+    routeSource,
+    /context_summary_updated_at:\s*summarizedAt/
+  );
+  assert.match(
+    routeSource,
+    /\.update\(\{\s*summarized_at:\s*summarizedAt\s*}\)[\s\S]*\.in\("id", summarizedMessageRowIds\)/
+  );
+});

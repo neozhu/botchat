@@ -12,6 +12,9 @@ import type { ExpertRow, SessionRow } from "@/lib/botchat/types";
 
 export const BOTCHAT_EXPERTS_TAG = "botchat-experts";
 
+const SESSION_SELECT =
+  "id, expert_id, title, last_message, context_summary, created_at, updated_at";
+
 type MessageRow = {
   ui_message_id: string;
   role: UIMessage["role"];
@@ -111,7 +114,7 @@ export const loadSessions = cache(async () => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("chat_sessions")
-    .select("id, expert_id, title, last_message, created_at, updated_at")
+    .select(SESSION_SELECT)
     .order("updated_at", { ascending: false })
     .limit(50);
 
@@ -126,50 +129,15 @@ export async function searchSessions(query: string, limit = 100) {
   const supabase = await createSupabaseServerClient();
   const like = `%${normalized}%`;
 
-  const [sessionMatches, messageMatches] = await Promise.all([
-    supabase
-      .from("chat_sessions")
-      .select("id, expert_id, title, last_message, created_at, updated_at")
-      .or(`title.ilike.${like},last_message.ilike.${like}`)
-      .order("updated_at", { ascending: false })
-      .limit(limit),
-    supabase
-      .from("chat_messages")
-      .select("session_id")
-      .ilike("content", like)
-      .order("created_at", { ascending: false })
-      .limit(limit * 4),
-  ]);
-
-  if (sessionMatches.error) throw new Error(sessionMatches.error.message);
-  if (messageMatches.error) throw new Error(messageMatches.error.message);
-
-  const directSessions = (sessionMatches.data ?? []) as SessionRow[];
-  const sessionIdSet = new Set(directSessions.map((row) => row.id));
-
-  const messageSessionIds = (messageMatches.data ?? [])
-    .map((row) => row.session_id)
-    .filter((value): value is string => typeof value === "string")
-    .filter((id) => !sessionIdSet.has(id));
-
-  if (messageSessionIds.length === 0) return directSessions;
-
-  const { data: messageLinkedSessions, error: messageLinkedSessionsError } = await supabase
+  const { data, error } = await supabase
     .from("chat_sessions")
-    .select("id, expert_id, title, last_message, created_at, updated_at")
-    .in("id", messageSessionIds)
+    .select(SESSION_SELECT)
+    .or(`title.ilike.${like},last_message.ilike.${like},context_summary.ilike.${like}`)
     .order("updated_at", { ascending: false })
     .limit(limit);
 
-  if (messageLinkedSessionsError) throw new Error(messageLinkedSessionsError.message);
-
-  const merged = [...directSessions, ...((messageLinkedSessions ?? []) as SessionRow[])];
-  const deduped = new Map<string, SessionRow>();
-  for (const session of merged) deduped.set(session.id, session);
-
-  return [...deduped.values()]
-    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-    .slice(0, limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as SessionRow[];
 }
 
 export const loadMessagesForSession = cache(async (sessionId: string) => {
@@ -194,7 +162,7 @@ export async function createSessionForExpert(userId: string, expertId: string) {
   const { data, error } = await supabase
     .from("chat_sessions")
     .insert(buildSessionInsertPayload(userId, expertId))
-    .select("id, expert_id, title, last_message, created_at, updated_at")
+    .select(SESSION_SELECT)
     .single();
 
   if (error) throw new Error(error.message);

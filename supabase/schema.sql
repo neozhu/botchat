@@ -4,6 +4,7 @@
 -- Run in Supabase SQL editor.
 
 create extension if not exists "pgcrypto";
+create extension if not exists pg_trgm with schema extensions;
 
 create table if not exists public.experts (
   id uuid primary key default gen_random_uuid(),
@@ -24,13 +25,23 @@ create table if not exists public.chat_sessions (
   user_id uuid references auth.users(id) on delete cascade,
   expert_id uuid not null references public.experts(id) on delete restrict,
   title text not null default 'New chat',
-  last_message text
+  last_message text,
+  context_summary text,
+  context_summary_updated_at timestamp with time zone
 );
 
 create index if not exists chat_sessions_updated_at_idx on public.chat_sessions(updated_at desc);
 create index if not exists chat_sessions_expert_id_idx on public.chat_sessions(expert_id);
 create index if not exists chat_sessions_user_id_updated_at_idx
   on public.chat_sessions(user_id, updated_at desc);
+create index if not exists chat_sessions_title_trgm_idx
+  on public.chat_sessions using gin (title gin_trgm_ops);
+create index if not exists chat_sessions_last_message_trgm_idx
+  on public.chat_sessions using gin (last_message gin_trgm_ops)
+  where last_message is not null;
+create index if not exists chat_sessions_context_summary_trgm_idx
+  on public.chat_sessions using gin (context_summary gin_trgm_ops)
+  where context_summary is not null;
 
 create table if not exists public.chat_messages (
   id uuid primary key default gen_random_uuid(),
@@ -39,7 +50,8 @@ create table if not exists public.chat_messages (
   ui_message_id text not null,
   role text not null check (role in ('user', 'assistant')),
   content text,
-  parts jsonb not null default '[]'::jsonb
+  parts jsonb not null default '[]'::jsonb,
+  summarized_at timestamp with time zone
 );
 
 create unique index if not exists chat_messages_session_ui_message_id_uniq
@@ -47,6 +59,8 @@ create unique index if not exists chat_messages_session_ui_message_id_uniq
 
 create index if not exists chat_messages_session_created_at_idx
   on public.chat_messages(session_id, created_at asc);
+create index if not exists chat_messages_session_summarized_created_at_idx
+  on public.chat_messages(session_id, summarized_at, created_at asc);
 
 create or replace function public.handle_updated_at()
 returns trigger as $$
@@ -64,6 +78,10 @@ create trigger set_updated_at
 
 comment on column public.chat_sessions.user_id is
   'Authenticated owner of the chat session. Nullable temporarily for legacy anonymous rows until they are backfilled or retired.';
+comment on column public.chat_sessions.context_summary is
+  'Rolling summary of earlier chat messages that should be sent as model context instead of replaying summarized messages.';
+comment on column public.chat_messages.summarized_at is
+  'Set when this message has been folded into chat_sessions.context_summary and can be skipped for model context.';
 
 -- RLS.
 -- Compatibility note:

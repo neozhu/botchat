@@ -15,7 +15,9 @@ import {
   getOpenAIModelId,
 } from "@/lib/ai/openai";
 import {
+  appendSavedConversationSummaryContext,
   buildConversationSummaryPrompt,
+  filterSummarizedMessages,
   prepareChatModelContext,
 } from "@/lib/botchat/chat-context";
 
@@ -114,18 +116,42 @@ export async function POST(request: Request) {
 
   let system =
     "You are a premium luggage brand assistant. Be concise, confident, and proactive with tasteful product suggestions.";
+  let contextSummary: string | null = null;
+  let summarizedUiMessageIds = new Set<string>();
 
   try {
     const supabase = await createSupabaseServerClient();
     if (sessionId) {
-      const { data } = await supabase
-        .from("chat_sessions")
-        .select("expert:experts(system_prompt)")
-        .eq("id", sessionId)
-        .maybeSingle();
+      const [sessionResult, summarizedMessagesResult] = await Promise.all([
+        supabase
+          .from("chat_sessions")
+          .select("expert:experts(system_prompt), context_summary")
+          .eq("id", sessionId)
+          .maybeSingle(),
+        supabase
+          .from("chat_messages")
+          .select("ui_message_id")
+          .eq("session_id", sessionId)
+          .not("summarized_at", "is", null),
+      ]);
 
-      const systemPrompt = systemPromptFromJoinRow(data);
+      const systemPrompt = systemPromptFromJoinRow(sessionResult.data);
       if (systemPrompt) system = systemPrompt;
+      if (
+        isRecord(sessionResult.data) &&
+        typeof sessionResult.data.context_summary === "string"
+      ) {
+        contextSummary = sessionResult.data.context_summary;
+      }
+      summarizedUiMessageIds = new Set(
+        (summarizedMessagesResult.data ?? [])
+          .map((row) =>
+            isRecord(row) && typeof row.ui_message_id === "string"
+              ? row.ui_message_id
+              : null
+          )
+          .filter((id): id is string => Boolean(id))
+      );
     } else if (expertId) {
       const { data } = await supabase
         .from("experts")
@@ -149,7 +175,14 @@ export async function POST(request: Request) {
     system = `${system}\n\n${buildCurrentSystemDateTimeContext()}`;
   }
 
-  const preparedContext = await prepareChatModelContext(messages as UIMessage[], {
+  system = appendSavedConversationSummaryContext(system, contextSummary);
+
+  const contextMessages = filterSummarizedMessages(
+    messages as UIMessage[],
+    summarizedUiMessageIds
+  );
+
+  const preparedContext = await prepareChatModelContext(contextMessages, {
     summarizeMessages: async (messagesToSummarize) => {
       const { text } = await generateText({
         model: openai(getConversationSummaryModelId()),

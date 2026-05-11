@@ -80,7 +80,7 @@ async function buildPersistentConversationSummary(
     model: openai(getConversationSummaryModelId()),
     providerOptions: {
       openai: {
-        reasoningEffort: "minimal",
+        reasoningEffort: "none",
       },
     },
     system:

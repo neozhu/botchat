@@ -1,7 +1,7 @@
 import type { UIMessage } from "ai";
 
 export const RECENT_CHAT_MESSAGE_COUNT = 5;
-export const MAX_CHAT_CONTEXT_TOKENS = 5_000;
+export const MAX_CHAT_CONTEXT_TOKENS = 1_000;
 export const FALLBACK_RECENT_CHAT_MESSAGE_COUNT = 2;
 export const COMPACT_AFTER_USER_MESSAGE_COUNT = 4;
 

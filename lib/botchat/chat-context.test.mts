@@ -118,13 +118,13 @@ test("prepareChatModelContext summarizes older messages and keeps the latest two
   assert.match(context.systemContext ?? "", /context compaction strategies/i);
 });
 
-test("prepareChatModelContext summarizes by default when recent context exceeds five thousand estimated tokens", async () => {
+test("prepareChatModelContext summarizes by default when recent context exceeds one thousand estimated tokens", async () => {
   const messages = Array.from({ length: 6 }, (_, index) =>
     textMessage(`m${index + 1}`, index % 2 === 0 ? "user" : "assistant", `message ${index + 1}`)
   );
 
   const context = await prepareChatModelContext(messages, {
-    estimateTokens: () => 5_001,
+    estimateTokens: () => 1_001,
     summarizeMessages: async () => "Earlier discussion summary.",
   });
 

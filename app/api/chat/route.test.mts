@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-test("conversation summary uses the configured summary model helper with minimal reasoning", () => {
+test("conversation summary uses the configured summary model helper with none reasoning", () => {
   const routeSource = readFileSync(
     fileURLToPath(new URL("./route.ts", import.meta.url)),
     "utf8"
@@ -20,7 +20,7 @@ test("conversation summary uses the configured summary model helper with minimal
   );
   assert.match(
     routeSource,
-    /summarizeMessages:[\s\S]*reasoningEffort:\s*"minimal"/
+    /summarizeMessages:[\s\S]*reasoningEffort:\s*"none"/
   );
 });
 

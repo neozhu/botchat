@@ -1,6 +1,6 @@
 export const SESSION_TITLE_MODEL_ID = "gpt-5.4-mini";
-export const SESSION_TITLE_MAX_ENGLISH_WORDS = 6;
-export const SESSION_TITLE_MAX_CJK_CHARACTERS = 10;
+export const SESSION_TITLE_MAX_ENGLISH_WORDS = 8;
+export const SESSION_TITLE_MAX_CJK_CHARACTERS = 12;
 
 const CJK_CHARACTER_PATTERN = /[\u3400-\u9fff]/u;
 const CJK_CHARACTER_GLOBAL_PATTERN = /[\u3400-\u9fff]/gu;

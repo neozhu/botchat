@@ -4,6 +4,11 @@ export const RECENT_CHAT_MESSAGE_COUNT = 5;
 export const MAX_CHAT_CONTEXT_TOKENS = 1_000;
 export const FALLBACK_RECENT_CHAT_MESSAGE_COUNT = 2;
 export const COMPACT_AFTER_USER_MESSAGE_COUNT = 4;
+export const COMPACT_AFTER_UNSUMMARIZED_TOTAL_TOKENS = MAX_CHAT_CONTEXT_TOKENS;
+export const BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS_ENV =
+  "BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS";
+export const BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT_ENV =
+  "BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT";
 
 const APPROX_CHARS_PER_TOKEN = 4;
 const SAVED_SUMMARY_CONTEXT_PREFIX =
@@ -24,6 +29,33 @@ type PreparedChatModelContext = {
   estimatedTokens: number;
   compacted: boolean;
 };
+
+type ChatContextEnv = Record<string, string | undefined>;
+
+export type ChatContextConfig = {
+  compactAfterTotalTokens: number;
+  compactAfterUserMessageCount: number;
+};
+
+function positiveIntegerFromEnv(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function getChatContextConfig(
+  env: ChatContextEnv = process.env
+): ChatContextConfig {
+  return {
+    compactAfterTotalTokens: positiveIntegerFromEnv(
+      env[BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS_ENV],
+      COMPACT_AFTER_UNSUMMARIZED_TOTAL_TOKENS
+    ),
+    compactAfterUserMessageCount: positiveIntegerFromEnv(
+      env[BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT_ENV],
+      COMPACT_AFTER_USER_MESSAGE_COUNT
+    ),
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -113,12 +145,19 @@ export function appendSavedConversationSummaryContext(
 }
 
 export function selectMessagesForPersistentSummary<
-  TMessage extends Pick<UIMessage, "role">,
+  TMessage extends Pick<UIMessage, "role"> & {
+    total_tokens?: number | null;
+  },
 >(
   messages: TMessage[],
-  compactAfterUserMessageCount = COMPACT_AFTER_USER_MESSAGE_COUNT
+  compactAfterTotalTokens = getChatContextConfig().compactAfterTotalTokens
 ): TMessage[] {
-  if (countUserMessages(messages) < compactAfterUserMessageCount) return [];
+  const totalTokens = messages.reduce((sum, message) => {
+    const tokens = message.total_tokens ?? 0;
+    return Number.isFinite(tokens) && tokens > 0 ? sum + tokens : sum;
+  }, 0);
+
+  if (totalTokens < compactAfterTotalTokens) return [];
 
   let latestUserMessageIndex = -1;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -162,13 +201,14 @@ export async function prepareChatModelContext(
   messages: UIMessage[],
   options: PrepareChatModelContextOptions = {}
 ): Promise<PreparedChatModelContext> {
+  const config = getChatContextConfig();
   const recentMessageCount =
     options.recentMessageCount ?? RECENT_CHAT_MESSAGE_COUNT;
-  const maxContextTokens = options.maxContextTokens ?? MAX_CHAT_CONTEXT_TOKENS;
+  const maxContextTokens = options.maxContextTokens ?? config.compactAfterTotalTokens;
   const fallbackRecentMessageCount =
     options.fallbackRecentMessageCount ?? FALLBACK_RECENT_CHAT_MESSAGE_COUNT;
   const compactAfterUserMessageCount =
-    options.compactAfterUserMessageCount ?? COMPACT_AFTER_USER_MESSAGE_COUNT;
+    options.compactAfterUserMessageCount ?? config.compactAfterUserMessageCount;
   const estimateTokens = options.estimateTokens ?? estimateMessagesTokens;
 
   const estimatedTokens = estimateTokens(messages);

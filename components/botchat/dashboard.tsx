@@ -32,6 +32,7 @@ function messageFingerprint(message: UIMessage) {
   return JSON.stringify({
     role: message.role,
     parts: (message as UIMessage).parts ?? [],
+    metadata: (message as { metadata?: unknown }).metadata ?? null,
   });
 }
 
@@ -85,6 +86,7 @@ type SyncedSessionUpdate = {
   id?: string;
   title?: string;
   last_message?: string | null;
+  total_tokens?: number;
   updated_at?: string;
 };
 
@@ -710,6 +712,9 @@ export default function BotchatDashboard({
                           : {}),
                         ...(typeof syncedSession.last_message === "string"
                           ? { last_message: syncedSession.last_message }
+                          : {}),
+                        ...(typeof syncedSession.total_tokens === "number"
+                          ? { total_tokens: syncedSession.total_tokens }
                           : {}),
                         ...(typeof syncedSession.updated_at === "string"
                           ? { updated_at: syncedSession.updated_at }

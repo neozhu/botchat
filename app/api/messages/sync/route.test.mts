@@ -57,3 +57,15 @@ test("message sync persists rolling conversation summaries after message upsert"
     /\.update\(\{\s*summarized_at:\s*summarizedAt\s*}\)[\s\S]*\.in\("id", summarizedMessageRowIds\)/
   );
 });
+
+test("message sync persists message token usage and refreshes the session token total", () => {
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("./route.ts", import.meta.url)),
+    "utf8"
+  );
+
+  assert.match(routeSource, /function\s+messageTotalTokens\(/);
+  assert.match(routeSource, /total_tokens:\s*messageTotalTokens\(m\)/);
+  assert.match(routeSource, /\.select\("total_tokens"\)[\s\S]*\.eq\("session_id", sessionId\)/);
+  assert.match(routeSource, /update\.total_tokens\s*=\s*sessionTotalTokens/);
+});

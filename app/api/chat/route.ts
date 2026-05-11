@@ -233,5 +233,12 @@ export async function POST(request: Request) {
     stopWhen: stepCountIs(2),
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toUIMessageStreamResponse({
+    originalMessages: messages as UIMessage[],
+    messageMetadata: ({ part }) => {
+      if (part.type === "finish") {
+        return { totalTokens: part.totalUsage.totalTokens };
+      }
+    },
+  });
 }

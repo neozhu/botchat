@@ -25,6 +25,7 @@ type UnsummarizedMessageRow = {
   ui_message_id: string;
   role: UIMessage["role"];
   parts: unknown;
+  total_tokens: number | null;
   created_at: string;
 };
 
@@ -42,6 +43,20 @@ function messageText(message: UIMessage) {
       .join("\n\n");
   }
   return (message as { content?: string }).content ?? "";
+}
+
+function messageTotalTokens(message: UIMessage) {
+  if (message.role !== "assistant") return 0;
+
+  const metadata = (message as { metadata?: unknown }).metadata;
+  if (typeof metadata !== "object" || metadata === null) return 0;
+
+  const totalTokens = (metadata as { totalTokens?: unknown }).totalTokens;
+  return typeof totalTokens === "number" &&
+    Number.isFinite(totalTokens) &&
+    totalTokens > 0
+    ? Math.round(totalTokens)
+    : 0;
 }
 
 async function buildSessionTitle(titleSource: string) {
@@ -106,7 +121,7 @@ async function persistRollingConversationSummaryIfNeeded(
       .maybeSingle(),
     supabase
       .from("chat_messages")
-      .select("id, ui_message_id, role, parts, created_at")
+      .select("id, ui_message_id, role, parts, total_tokens, created_at")
       .eq("session_id", sessionId)
       .is("summarized_at", null)
       .order("created_at", { ascending: true }),
@@ -125,7 +140,8 @@ async function persistRollingConversationSummaryIfNeeded(
     (row): row is UnsummarizedMessageRow =>
       typeof row.id === "string" &&
       typeof row.ui_message_id === "string" &&
-      (row.role === "user" || row.role === "assistant")
+      (row.role === "user" || row.role === "assistant") &&
+      (typeof row.total_tokens === "number" || row.total_tokens === null)
   );
   const rowsToSummarize =
     selectMessagesForPersistentSummary(unsummarizedRows);
@@ -161,6 +177,27 @@ async function persistRollingConversationSummaryIfNeeded(
   return { summary, summarizedAt };
 }
 
+async function refreshSessionTotalTokens(
+  supabase: SupabaseServerClient,
+  sessionId: string
+) {
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .select("total_tokens")
+    .eq("session_id", sessionId);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).reduce((sum, row) => {
+    const totalTokens = row.total_tokens;
+    return typeof totalTokens === "number" &&
+      Number.isFinite(totalTokens) &&
+      totalTokens > 0
+      ? sum + totalTokens
+      : sum;
+  }, 0);
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
 
@@ -192,6 +229,7 @@ export async function POST(request: Request) {
     role: m.role,
     content: messageText(m),
     parts: (m as UIMessage).parts ?? [],
+    total_tokens: messageTotalTokens(m),
   }));
 
   const supabase = await createSupabaseServerClient();
@@ -238,6 +276,16 @@ export async function POST(request: Request) {
   const update: Record<string, unknown> = {};
   if (lastText) update.last_message = lastText;
   if (title) update.title = title;
+
+  try {
+    const sessionTotalTokens = await refreshSessionTotalTokens(
+      supabase,
+      sessionId
+    );
+    update.total_tokens = sessionTotalTokens;
+  } catch (error) {
+    console.error("Failed to refresh session token total", error);
+  }
 
   if (Object.keys(update).length > 0) {
     const { error: sessionError } = await supabase

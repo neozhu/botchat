@@ -6,6 +6,7 @@ import {
   appendSavedConversationSummaryContext,
   buildRollingConversationSummaryPrompt,
   filterSummarizedMessages,
+  getChatContextConfig,
   prepareChatModelContext,
   estimateMessagesTokens,
   selectMessagesForPersistentSummary,
@@ -18,6 +19,65 @@ function textMessage(id: string, role: UIMessage["role"], text: string): UIMessa
     parts: [{ type: "text", text }],
   };
 }
+
+async function withoutChatContextEnv<T>(run: () => T | Promise<T>) {
+  const previousTotalTokens = process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS;
+  const previousUserMessageCount =
+    process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT;
+
+  delete process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS;
+  delete process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT;
+
+  try {
+    return await run();
+  } finally {
+    if (previousTotalTokens === undefined) {
+      delete process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS;
+    } else {
+      process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS = previousTotalTokens;
+    }
+
+    if (previousUserMessageCount === undefined) {
+      delete process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT;
+    } else {
+      process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT =
+        previousUserMessageCount;
+    }
+  }
+}
+
+test("getChatContextConfig keeps default compaction thresholds when env vars are absent", () => {
+  assert.deepEqual(getChatContextConfig({}), {
+    compactAfterTotalTokens: 1_000,
+    compactAfterUserMessageCount: 4,
+  });
+});
+
+test("getChatContextConfig reads positive integer compaction thresholds from env", () => {
+  assert.deepEqual(
+    getChatContextConfig({
+      BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS: "2400",
+      BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT: "7",
+    }),
+    {
+      compactAfterTotalTokens: 2_400,
+      compactAfterUserMessageCount: 7,
+    }
+  );
+});
+
+test("getChatContextConfig ignores invalid compaction threshold env values", () => {
+  assert.deepEqual(
+    getChatContextConfig({
+      BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS: "0",
+      BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT: "not-a-number",
+    }),
+    {
+      compactAfterTotalTokens: 1_000,
+      compactAfterUserMessageCount: 4,
+    }
+  );
+});
 
 test("prepareChatModelContext keeps the full conversation when it fits the token budget", async () => {
   const messages = Array.from({ length: 6 }, (_, index) =>
@@ -119,20 +179,22 @@ test("prepareChatModelContext summarizes older messages and keeps the latest two
 });
 
 test("prepareChatModelContext summarizes by default when recent context exceeds one thousand estimated tokens", async () => {
-  const messages = Array.from({ length: 6 }, (_, index) =>
-    textMessage(`m${index + 1}`, index % 2 === 0 ? "user" : "assistant", `message ${index + 1}`)
-  );
+  await withoutChatContextEnv(async () => {
+    const messages = Array.from({ length: 6 }, (_, index) =>
+      textMessage(`m${index + 1}`, index % 2 === 0 ? "user" : "assistant", `message ${index + 1}`)
+    );
 
-  const context = await prepareChatModelContext(messages, {
-    estimateTokens: () => 1_001,
-    summarizeMessages: async () => "Earlier discussion summary.",
+    const context = await prepareChatModelContext(messages, {
+      estimateTokens: () => 1_001,
+      summarizeMessages: async () => "Earlier discussion summary.",
+    });
+
+    assert.deepEqual(
+      context.messages.map((message) => message.id),
+      ["m5", "m6"]
+    );
+    assert.match(context.systemContext ?? "", /Earlier discussion summary/);
   });
-
-  assert.deepEqual(
-    context.messages.map((message) => message.id),
-    ["m5", "m6"]
-  );
-  assert.match(context.systemContext ?? "", /Earlier discussion summary/);
 });
 
 test("estimateMessagesTokens grows with message text size", () => {
@@ -169,37 +231,92 @@ test("appendSavedConversationSummaryContext appends a trimmed persisted summary"
   );
 });
 
-test("selectMessagesForPersistentSummary summarizes completed turns before the fourth user message", () => {
-  const messages = [
-    textMessage("u1", "user", "user 1"),
-    textMessage("a1", "assistant", "assistant 1"),
-    textMessage("u2", "user", "user 2"),
-    textMessage("a2", "assistant", "assistant 2"),
-    textMessage("u3", "user", "user 3"),
-    textMessage("a3", "assistant", "assistant 3"),
-    textMessage("u4", "user", "user 4"),
-    textMessage("a4", "assistant", "assistant 4"),
-  ];
+test("selectMessagesForPersistentSummary summarizes completed turns when unsummarized tokens reach the threshold", () => {
+  return withoutChatContextEnv(() => {
+    const messages = [
+      { ...textMessage("u1", "user", "user 1"), total_tokens: 0 },
+      { ...textMessage("a1", "assistant", "assistant 1"), total_tokens: 650 },
+      { ...textMessage("u2", "user", "user 2"), total_tokens: 0 },
+      { ...textMessage("a2", "assistant", "assistant 2"), total_tokens: 350 },
+    ];
 
-  const selected = selectMessagesForPersistentSummary(messages);
+    const selected = selectMessagesForPersistentSummary(messages);
 
-  assert.deepEqual(
-    selected.map((message) => message.id),
-    ["u1", "a1", "u2", "a2", "u3", "a3"]
-  );
+    assert.deepEqual(
+      selected.map((message) => message.id),
+      ["u1", "a1"]
+    );
+  });
 });
 
-test("selectMessagesForPersistentSummary waits until the fourth unsummarized user message", () => {
-  const messages = [
-    textMessage("u1", "user", "user 1"),
-    textMessage("a1", "assistant", "assistant 1"),
-    textMessage("u2", "user", "user 2"),
-    textMessage("a2", "assistant", "assistant 2"),
-    textMessage("u3", "user", "user 3"),
-    textMessage("a3", "assistant", "assistant 3"),
-  ];
+test("prepareChatModelContext uses env user-message compaction threshold by default", async () => {
+  const previous = process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT;
+  process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "5";
 
-  assert.deepEqual(selectMessagesForPersistentSummary(messages), []);
+  try {
+    const messages = [
+      textMessage("m1", "user", "first user message"),
+      textMessage("m2", "assistant", "first assistant response"),
+      textMessage("m3", "user", "second user message"),
+      textMessage("m4", "assistant", "second assistant response"),
+      textMessage("m5", "user", "third user message"),
+      textMessage("m6", "assistant", "third assistant response"),
+      textMessage("m7", "user", "fourth user message"),
+    ];
+
+    const context = await prepareChatModelContext(messages, {
+      maxContextTokens: 12_000,
+      estimateTokens: () => 500,
+      summarizeMessages: async () => "Earlier discussion summary.",
+    });
+
+    assert.equal(context.compacted, false);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT;
+    } else {
+      process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = previous;
+    }
+  }
+});
+
+test("selectMessagesForPersistentSummary waits until unsummarized tokens reach the threshold", () => {
+  return withoutChatContextEnv(() => {
+    const messages = [
+      { ...textMessage("u1", "user", "user 1"), total_tokens: 0 },
+      { ...textMessage("a1", "assistant", "assistant 1"), total_tokens: 200 },
+      { ...textMessage("u2", "user", "user 2"), total_tokens: 0 },
+      { ...textMessage("a2", "assistant", "assistant 2"), total_tokens: 200 },
+      { ...textMessage("u3", "user", "user 3"), total_tokens: 0 },
+      { ...textMessage("a3", "assistant", "assistant 3"), total_tokens: 200 },
+      { ...textMessage("u4", "user", "user 4"), total_tokens: 0 },
+      { ...textMessage("a4", "assistant", "assistant 4"), total_tokens: 200 },
+    ];
+
+    assert.deepEqual(selectMessagesForPersistentSummary(messages), []);
+  });
+});
+
+test("selectMessagesForPersistentSummary uses env token threshold by default", () => {
+  const previous = process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS;
+  process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS = "1200";
+
+  try {
+    const messages = [
+      { ...textMessage("u1", "user", "user 1"), total_tokens: 0 },
+      { ...textMessage("a1", "assistant", "assistant 1"), total_tokens: 650 },
+      { ...textMessage("u2", "user", "user 2"), total_tokens: 0 },
+      { ...textMessage("a2", "assistant", "assistant 2"), total_tokens: 350 },
+    ];
+
+    assert.deepEqual(selectMessagesForPersistentSummary(messages), []);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS;
+    } else {
+      process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS = previous;
+    }
+  }
 });
 
 test("buildRollingConversationSummaryPrompt includes the prior summary and new transcript", () => {

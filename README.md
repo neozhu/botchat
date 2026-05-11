@@ -37,6 +37,12 @@ Required:
 - `OPENAI_API_KEY` – your OpenAI API key
 - `OPENAI_MODEL` – e.g. `gpt-5-mini` (model is not hardcoded in code)
 
+Optional chat context compaction:
+
+- `OPENAI_CONVERSATION_SUMMARY_MODEL` – model used for session title and context summary generation; falls back to `OPENAI_MODEL`
+- `BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS` – actual unsummarized chat token threshold before persisting a rolling session summary; defaults to `1000`
+- `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT` – user-message count threshold before runtime context compaction; defaults to `4`
+
 Supabase (recommended for sessions/experts/attachments):
 
 - `PUBLIC_SUPABASE_URL`
@@ -83,7 +89,7 @@ docker compose up -d --build
 
 App is exposed at `http://localhost:3202` (mapped from container `3000`).
 
-Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in your deployment platform or `docker-compose.yml`.
+Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_CONVERSATION_SUMMARY_MODEL`, `BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS`, `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in your deployment platform or `docker-compose.yml`.
 
 ## Project structure
 

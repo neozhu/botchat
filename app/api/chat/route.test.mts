@@ -51,3 +51,15 @@ test("chat route uses persisted session summary state before runtime compaction"
     /appendSavedConversationSummaryContext\(system, contextSummary\)/
   );
 });
+
+test("chat route attaches final total token usage to assistant message metadata", () => {
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("./route.ts", import.meta.url)),
+    "utf8"
+  );
+
+  assert.match(routeSource, /toUIMessageStreamResponse\(\{/);
+  assert.match(routeSource, /messageMetadata:\s*\(\{\s*part\s*}\)/);
+  assert.match(routeSource, /part\.type\s*===\s*"finish"/);
+  assert.match(routeSource, /totalTokens:\s*part\.totalUsage\.totalTokens/);
+});

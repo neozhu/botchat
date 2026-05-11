@@ -13,12 +13,13 @@ import type { ExpertRow, SessionRow } from "@/lib/botchat/types";
 export const BOTCHAT_EXPERTS_TAG = "botchat-experts";
 
 const SESSION_SELECT =
-  "id, expert_id, title, last_message, context_summary, created_at, updated_at";
+  "id, expert_id, title, last_message, total_tokens, context_summary, created_at, updated_at";
 
 type MessageRow = {
   ui_message_id: string;
   role: UIMessage["role"];
   parts: UIMessage["parts"];
+  total_tokens: number | null;
   created_at: string;
 };
 
@@ -47,6 +48,10 @@ function toUiMessages(rows: MessageRow[]) {
     id: row.ui_message_id,
     role: row.role,
     parts: coerceParts(row.parts),
+    metadata:
+      row.total_tokens && row.total_tokens > 0
+        ? { totalTokens: row.total_tokens }
+        : undefined,
   })) as UIMessage[];
 }
 
@@ -144,7 +149,7 @@ export const loadMessagesForSession = cache(async (sessionId: string) => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("chat_messages")
-    .select("ui_message_id, role, parts, created_at")
+    .select("ui_message_id, role, parts, total_tokens, created_at")
     .eq("session_id", sessionId)
     .order("created_at", { ascending: true });
 

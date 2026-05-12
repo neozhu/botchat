@@ -150,14 +150,21 @@ export function selectMessagesForPersistentSummary<
   },
 >(
   messages: TMessage[],
-  compactAfterTotalTokens = getChatContextConfig().compactAfterTotalTokens
+  compactAfterTotalTokens = getChatContextConfig().compactAfterTotalTokens,
+  compactAfterUserMessageCount =
+    getChatContextConfig().compactAfterUserMessageCount
 ): TMessage[] {
   const totalTokens = messages.reduce((sum, message) => {
     const tokens = message.total_tokens ?? 0;
     return Number.isFinite(tokens) && tokens > 0 ? sum + tokens : sum;
   }, 0);
+  const shouldCompactByTotalTokens = totalTokens >= compactAfterTotalTokens;
+  const shouldCompactByUserMessageCount =
+    countUserMessages(messages) >= compactAfterUserMessageCount;
 
-  if (totalTokens < compactAfterTotalTokens) return [];
+  if (!shouldCompactByTotalTokens && !shouldCompactByUserMessageCount) {
+    return [];
+  }
 
   let latestUserMessageIndex = -1;
   for (let index = messages.length - 1; index >= 0; index -= 1) {

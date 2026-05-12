@@ -280,7 +280,7 @@ test("prepareChatModelContext uses env user-message compaction threshold by defa
   }
 });
 
-test("selectMessagesForPersistentSummary waits until unsummarized tokens reach the threshold", () => {
+test("selectMessagesForPersistentSummary summarizes when unsummarized user messages reach the threshold", () => {
   return withoutChatContextEnv(() => {
     const messages = [
       { ...textMessage("u1", "user", "user 1"), total_tokens: 0 },
@@ -291,6 +291,26 @@ test("selectMessagesForPersistentSummary waits until unsummarized tokens reach t
       { ...textMessage("a3", "assistant", "assistant 3"), total_tokens: 200 },
       { ...textMessage("u4", "user", "user 4"), total_tokens: 0 },
       { ...textMessage("a4", "assistant", "assistant 4"), total_tokens: 200 },
+    ];
+
+    const selected = selectMessagesForPersistentSummary(messages);
+
+    assert.deepEqual(
+      selected.map((message) => message.id),
+      ["u1", "a1", "u2", "a2", "u3", "a3"]
+    );
+  });
+});
+
+test("selectMessagesForPersistentSummary waits until both persistent thresholds are unmet", () => {
+  return withoutChatContextEnv(() => {
+    const messages = [
+      { ...textMessage("u1", "user", "user 1"), total_tokens: 0 },
+      { ...textMessage("a1", "assistant", "assistant 1"), total_tokens: 200 },
+      { ...textMessage("u2", "user", "user 2"), total_tokens: 0 },
+      { ...textMessage("a2", "assistant", "assistant 2"), total_tokens: 200 },
+      { ...textMessage("u3", "user", "user 3"), total_tokens: 0 },
+      { ...textMessage("a3", "assistant", "assistant 3"), total_tokens: 200 },
     ];
 
     assert.deepEqual(selectMessagesForPersistentSummary(messages), []);

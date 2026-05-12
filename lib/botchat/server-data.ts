@@ -151,7 +151,7 @@ export const loadMessagesForSession = cache(async (sessionId: string) => {
     .from("chat_messages")
     .select("ui_message_id, role, parts, total_tokens, created_at")
     .eq("session_id", sessionId)
-    .order("created_at", { ascending: true });
+    .order("position", { ascending: true });
 
   if (error) throw new Error(error.message);
 

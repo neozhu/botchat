@@ -20,17 +20,18 @@ type SupabaseServerClient = Awaited<
   ReturnType<typeof createSupabaseServerClient>
 >;
 
+type PersistableUIMessage = UIMessage & { position?: number };
+
 type UnsummarizedMessageRow = {
   id: string;
   ui_message_id: string;
   role: UIMessage["role"];
   parts: unknown;
   total_tokens: number | null;
-  created_at: string;
 };
 
-function coerceMessages(value: unknown): UIMessage[] {
-  return Array.isArray(value) ? (value as UIMessage[]) : [];
+function coerceMessages(value: unknown): PersistableUIMessage[] {
+  return Array.isArray(value) ? (value as PersistableUIMessage[]) : [];
 }
 
 function messageText(message: UIMessage) {
@@ -121,10 +122,10 @@ async function persistRollingConversationSummaryIfNeeded(
       .maybeSingle(),
     supabase
       .from("chat_messages")
-      .select("id, ui_message_id, role, parts, total_tokens, created_at")
+      .select("id, ui_message_id, role, parts, total_tokens")
       .eq("session_id", sessionId)
       .is("summarized_at", null)
-      .order("created_at", { ascending: true }),
+      .order("position", { ascending: true }),
   ]);
 
   if (sessionResult.error) throw new Error(sessionResult.error.message);
@@ -222,13 +223,14 @@ export async function POST(request: Request) {
   const firstUser = messages.find((m) => m.role === "user") ?? null;
   const titleSource = firstUser ? messageText(firstUser).trim() : null;
 
-  const rows = messages.map((m) => ({
+  const rows = messages.map((m, index) => ({
     session_id: sessionId,
     ui_message_id: m.id,
     role: m.role,
     content: messageText(m),
     parts: (m as UIMessage).parts ?? [],
     total_tokens: messageTotalTokens(m),
+    position: m.position ?? index,
   }));
 
   const supabase = await createSupabaseServerClient();

@@ -58,3 +58,18 @@ test("session search uses only session-level fields including context summary", 
   );
   assert.doesNotMatch(searchFunction, /\.from\("chat_messages"\)/);
 });
+
+test("session message loading uses explicit position order", () => {
+  const source = readFileSync(
+    fileURLToPath(new URL("./server-data.ts", import.meta.url)),
+    "utf8"
+  );
+  const loadFunction = source.slice(
+    source.indexOf("export const loadMessagesForSession"),
+    source.indexOf("export async function createSessionForExpert")
+  );
+
+  assert.match(loadFunction, /\.order\("position", \{ ascending: true \}\)/);
+  assert.doesNotMatch(loadFunction, /nullsFirst/);
+  assert.doesNotMatch(loadFunction, /\.order\("created_at"/);
+});

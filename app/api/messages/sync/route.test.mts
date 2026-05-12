@@ -70,3 +70,16 @@ test("message sync persists message token usage and refreshes the session token 
   assert.match(routeSource, /\.select\("total_tokens"\)[\s\S]*\.eq\("session_id", sessionId\)/);
   assert.match(routeSource, /update\.total_tokens\s*=\s*sessionTotalTokens/);
 });
+
+
+test("message sync stores and summarizes messages by explicit position", () => {
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("./route.ts", import.meta.url)),
+    "utf8"
+  );
+
+  assert.match(routeSource, /type\s+PersistableUIMessage\s*=\s*UIMessage & \{ position\?: number \}/);
+  assert.match(routeSource, /position:\s*m\.position \?\? index/);
+  assert.match(routeSource, /\.order\("position", \{ ascending: true \}\)/);
+  assert.doesNotMatch(routeSource, /nullsFirst/);
+});

@@ -684,7 +684,10 @@ export default function BotchatDashboard({
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               sessionId,
-              messages: toUpsert,
+              messages: toUpsert.map((message) => ({
+                ...message,
+                position: messages.findIndex((m) => m.id === message.id),
+              })),
             }),
           });
 

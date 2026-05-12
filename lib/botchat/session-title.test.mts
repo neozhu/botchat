@@ -16,20 +16,25 @@ test("session title model is the fast mini model", () => {
   assert.equal(SESSION_TITLE_MODEL_ID, "gpt-5.4-mini");
 });
 
-test("session title over-limit detection uses six English words", () => {
+test("session title over-limit detection uses twelve English words", () => {
   assert.equal(
-    isSessionTitleTooLong("one two three four five six"),
+    isSessionTitleTooLong(
+      "one two three four five six seven eight nine ten eleven twelve"
+    ),
     false
   );
   assert.equal(
-    isSessionTitleTooLong("one two three four five six seven"),
+    isSessionTitleTooLong(
+      "one two three four five six seven eight nine ten eleven twelve thirteen"
+    ),
     true
   );
 });
 
-test("session title over-limit detection uses ten Chinese characters", () => {
+test("session title over-limit detection uses twelve Chinese characters", () => {
   assert.equal(isSessionTitleTooLong("设计智能聊天助手"), false);
-  assert.equal(isSessionTitleTooLong("设计智能聊天助手并更新搜索信息"), true);
+  assert.equal(isSessionTitleTooLong("设计智能聊天助手品牌标识"), false);
+  assert.equal(isSessionTitleTooLong("设计智能聊天助手品牌标识符"), true);
 });
 
 test("normalizeGeneratedSessionTitle removes wrappers and enforces the title limit", () => {
@@ -38,7 +43,7 @@ test("normalizeGeneratedSessionTitle removes wrappers and enforces the title lim
       '"Design a polished expert AI chat workspace title with attachments"',
       "fallback"
     ),
-    "Design a polished expert AI chat"
+    "Design a polished expert AI chat workspace title with attachments"
   );
 
   assert.equal(
@@ -46,27 +51,32 @@ test("normalizeGeneratedSessionTitle removes wrappers and enforces the title lim
       "设计智能聊天助手品牌标识并更新搜索分享图片",
       "fallback"
     ),
-    "设计智能聊天助手品牌"
+    "设计智能聊天助手品牌标识"
   );
 
   assert.ok(
     isSessionTitleTooLong(
-      "Design a polished expert AI chat workspace title with attachments"
+      "Design a polished expert AI chat workspace title with attachments and persistent context"
     ) === true
   );
-  assert.equal(SESSION_TITLE_MAX_ENGLISH_WORDS, 6);
-  assert.equal(SESSION_TITLE_MAX_CJK_CHARACTERS, 10);
+  assert.equal(SESSION_TITLE_MAX_ENGLISH_WORDS, 12);
+  assert.equal(SESSION_TITLE_MAX_CJK_CHARACTERS, 12);
 });
 
-test("session title prompt asks for semantic summarization without examples", () => {
+test("session title prompt uses the concise title instruction", () => {
   const prompt = buildSessionTitlePrompt(
     "我测试了发现标题只是直接截断了，需要用AI总结内容保持句子含义"
   );
 
-  assert.match(prompt, /semantic summary/i);
-  assert.match(prompt, /Do not truncate/i);
-  assert.match(prompt, /Maximum 6 English words/);
-  assert.match(prompt, /10 Chinese characters/);
+  assert.match(prompt, /Summarize the user's input into a very short title\./);
+  assert.match(
+    prompt,
+    new RegExp(
+      `Use no more than ${SESSION_TITLE_MAX_CJK_CHARACTERS} Chinese characters for Chinese, and no more than ${SESSION_TITLE_MAX_ENGLISH_WORDS} words for English\\.`
+    )
+  );
+  assert.match(prompt, /Output only the title\./);
+  assert.match(prompt, /User input:/);
   assert.doesNotMatch(prompt, /Examples:/);
   assert.doesNotMatch(prompt, /bad title/i);
   assert.doesNotMatch(prompt, /good title/i);

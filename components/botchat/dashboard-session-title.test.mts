@@ -15,3 +15,8 @@ test("dashboard waits for server AI title and applies sync response", () => {
     /fetch\("\/api\/messages\/sync"[\s\S]*?signal:\s*abort\.signal/
   );
 });
+
+test("dashboard sends absolute message order when syncing new rows", () => {
+  assert.match(source, /position:\s*messages\.findIndex\(\(m\) => m\.id === message\.id\)/);
+  assert.match(source, /messages:\s*toUpsert\.map\(\(message\) => \(\{/);
+});

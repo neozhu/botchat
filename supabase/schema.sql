@@ -53,6 +53,7 @@ create table if not exists public.chat_messages (
   content text,
   parts jsonb not null default '[]'::jsonb,
   total_tokens integer not null default 0 check (total_tokens >= 0),
+  position integer not null default 0 check (position >= 0),
   summarized_at timestamp with time zone
 );
 
@@ -61,8 +62,10 @@ create unique index if not exists chat_messages_session_ui_message_id_uniq
 
 create index if not exists chat_messages_session_created_at_idx
   on public.chat_messages(session_id, created_at asc);
-create index if not exists chat_messages_session_summarized_created_at_idx
-  on public.chat_messages(session_id, summarized_at, created_at asc);
+create index if not exists chat_messages_session_position_idx
+  on public.chat_messages(session_id, position asc);
+create index if not exists chat_messages_session_summarized_position_idx
+  on public.chat_messages(session_id, summarized_at, position asc);
 
 create or replace function public.handle_updated_at()
 returns trigger as $$
@@ -86,6 +89,8 @@ comment on column public.chat_sessions.total_tokens is
   'Sum of chat model token usage recorded on messages in this session. Excludes title and summary generation.';
 comment on column public.chat_messages.total_tokens is
   'Actual chat model token usage for this message row. Assistant messages store response total usage; user messages default to 0.';
+comment on column public.chat_messages.position is
+  'Zero-based message order within a session, assigned from the client conversation array so user/assistant turns remain stable even when rows are inserted concurrently.';
 comment on column public.chat_messages.summarized_at is
   'Set when this message has been folded into chat_sessions.context_summary and can be skipped for model context.';
 

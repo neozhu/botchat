@@ -1,5 +1,5 @@
 export const SESSION_TITLE_MODEL_ID = "gpt-5.4-mini";
-export const SESSION_TITLE_MAX_ENGLISH_WORDS = 8;
+export const SESSION_TITLE_MAX_ENGLISH_WORDS = 12;
 export const SESSION_TITLE_MAX_CJK_CHARACTERS = 12;
 
 const CJK_CHARACTER_PATTERN = /[\u3400-\u9fff]/u;
@@ -78,16 +78,8 @@ export function shouldGenerateSessionTitle(
 }
 
 export function buildSessionTitlePrompt(firstUserMessage: string) {
-  return `Create a semantic summary title for this first user message.
+  return `Summarize the user's input into a very short title. Keep the original language. Use no more than 12 Chinese characters for Chinese, and no more than 12 words for English. Output only the title.
 
-Rules:
-- Maximum ${SESSION_TITLE_MAX_ENGLISH_WORDS} English words, or ${SESSION_TITLE_MAX_CJK_CHARACTERS} Chinese characters for Chinese titles.
-- Preserve the user's main intent and the actual task/topic.
-- Do not truncate or copy the beginning of the message.
-- Rewrite the meaning into a compact title.
-- Return only the title.
-- Do not answer the user.
-- Do not include quotes, punctuation wrappers, markdown, or explanations.
-First user message:
+User input:
 ${firstUserMessage}`;
 }

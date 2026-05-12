@@ -151,7 +151,6 @@ async function persistRollingConversationSummaryIfNeeded(
     previousSummary,
     rowsToSummarize.map(rowToUiMessage)
   );
-  if (!summary) return null;
 
   const summarizedAt = new Date().toISOString();
   const summarizedMessageRowIds = rowsToSummarize.map((row) => row.id);

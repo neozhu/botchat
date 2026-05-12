@@ -56,6 +56,7 @@ test("message sync persists rolling conversation summaries after message upsert"
     routeSource,
     /\.update\(\{\s*summarized_at:\s*summarizedAt\s*}\)[\s\S]*\.in\("id", summarizedMessageRowIds\)/
   );
+  assert.doesNotMatch(routeSource, /if\s*\(\s*!summary\s*\)\s*return\s+null/);
 });
 
 test("message sync persists message token usage and refreshes the session token total", () => {

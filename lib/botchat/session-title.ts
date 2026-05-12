@@ -78,7 +78,7 @@ export function shouldGenerateSessionTitle(
 }
 
 export function buildSessionTitlePrompt(firstUserMessage: string) {
-  return `Summarize the user's input into a very short title. Keep the original language. Use no more than 12 Chinese characters for Chinese, and no more than 12 words for English. Output only the title.
+  return `Summarize the user's input into a very short title. Keep the original language. Use no more than ${SESSION_TITLE_MAX_CJK_CHARACTERS} Chinese characters for Chinese, and no more than ${SESSION_TITLE_MAX_ENGLISH_WORDS} words for English. Output only the title.
 
 User input:
 ${firstUserMessage}`;

@@ -68,10 +68,14 @@ test("session title prompt uses the concise title instruction", () => {
     "我测试了发现标题只是直接截断了，需要用AI总结内容保持句子含义"
   );
 
+  assert.match(prompt, /Summarize the user's input into a very short title\./);
   assert.match(
     prompt,
-    /Summarize the user's input into a very short title\. Keep the original language\. Use no more than 12 Chinese characters for Chinese, and no more than 12 words for English\. Output only the title\./
+    new RegExp(
+      `Use no more than ${SESSION_TITLE_MAX_CJK_CHARACTERS} Chinese characters for Chinese, and no more than ${SESSION_TITLE_MAX_ENGLISH_WORDS} words for English\\.`
+    )
   );
+  assert.match(prompt, /Output only the title\./);
   assert.match(prompt, /User input:/);
   assert.doesNotMatch(prompt, /Examples:/);
   assert.doesNotMatch(prompt, /bad title/i);

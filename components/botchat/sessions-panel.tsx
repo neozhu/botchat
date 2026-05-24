@@ -296,7 +296,7 @@ export function SessionsPanel({
                       isActive={item.id === activeSessionId}
                       tooltip={item.title}
                       className={cn(
-                        "min-h-[58px] rounded-[20px] px-3 py-2.5 pr-10",
+                        "min-h-[58px] justify-start rounded-[20px] px-3 py-2.5 pr-10",
                         "group-data-[collapsible=icon]:min-h-[46px] group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center",
                         item.id === activeSessionId
                           ? "bg-white shadow-[0_18px_40px_-28px_rgba(32,24,70,0.6)]"
@@ -316,16 +316,16 @@ export function SessionsPanel({
                           {String(index + 1).padStart(2, "0")}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex min-w-0 flex-1 basis-0 flex-col group-data-[collapsible=icon]:hidden">
+                        <div className="flex w-full min-w-0 items-center gap-2">
                           <span className="min-w-0 flex-1 truncate text-xs font-semibold">
                             {item.title}
                           </span>
-                          <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">
+                          <span className="shrink-0 whitespace-nowrap text-[10px] text-muted-foreground">
                             {formatRelativeTime(item.updated_at, nowMs)}
                           </span>
                         </div>
-                        <p className="truncate text-[11px] text-muted-foreground">
+                        <p className="w-full truncate text-[11px] text-muted-foreground">
                           {item.last_message ?? "—"}
                         </p>
                       </div>

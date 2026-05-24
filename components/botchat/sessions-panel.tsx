@@ -316,12 +316,12 @@ export function SessionsPanel({
                           {String(index + 1).padStart(2, "0")}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-                        <div className="flex items-center gap-1.5">
-                          <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+                      <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className="min-w-0 truncate text-xs font-semibold">
                             {item.title}
                           </span>
-                          <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">
+                          <span className="shrink-0 whitespace-nowrap text-[10px] text-muted-foreground">
                             {formatRelativeTime(item.updated_at, nowMs)}
                           </span>
                         </div>

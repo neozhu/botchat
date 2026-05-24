@@ -53,22 +53,22 @@ function formatRelativeTime(thenIso: string, nowMs: number) {
   if (!Number.isFinite(thenMs)) return "—";
 
   const elapsedSeconds = Math.max(0, Math.floor((nowMs - thenMs) / 1000));
-  if (elapsedSeconds < 60) return "just now";
+  if (elapsedSeconds < 60) return "Just now";
 
   const elapsedMinutes = Math.floor(elapsedSeconds / 60);
   if (elapsedMinutes < 60) {
-    return `${elapsedMinutes} minute${elapsedMinutes === 1 ? "" : "s"} ago`;
+    return `${elapsedMinutes} min`;
   }
 
   const elapsedHours = Math.floor(elapsedMinutes / 60);
   if (elapsedHours < 24) {
-    return `${elapsedHours} hour${elapsedHours === 1 ? "" : "s"} ago`;
+    return `${elapsedHours} hr`;
   }
 
   const elapsedDays = Math.floor(elapsedHours / 24);
-  if (elapsedDays === 1) return "yesterday";
+  if (elapsedDays === 1) return "Yesterday";
   if (elapsedDays < 7) {
-    return `${elapsedDays} day${elapsedDays === 1 ? "" : "s"} ago`;
+    return `${elapsedDays} days`;
   }
 
   return new Intl.DateTimeFormat("en-US", {

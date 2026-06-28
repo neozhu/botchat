@@ -1,8 +1,10 @@
 import {
   convertToModelMessages,
+  createUIMessageStreamResponse,
   generateText,
-  stepCountIs,
+  isStepCount,
   streamText,
+  toUIMessageStream,
   tool,
   type UIMessage,
 } from "ai";
@@ -20,6 +22,10 @@ import {
   filterSummarizedMessages,
   prepareChatModelContext,
 } from "@/lib/botchat/chat-context";
+import {
+  appendChatSkillInstructions,
+  loadChatSkillsForPrompt,
+} from "@/lib/botchat/skills";
 
 export const maxDuration = 30;
 
@@ -166,6 +172,11 @@ export async function POST(request: Request) {
     // Fallback to default system prompt if Supabase is unavailable.
   }
 
+  system = appendChatSkillInstructions(
+    system,
+    await loadChatSkillsForPrompt(system)
+  );
+
   system = `${system}\n\nWhen the user asks for the current date, current time, today's date, or the current time zone, call the getCurrentSystemDateTime tool before answering. Do not claim that you cannot access the current time if this tool is available.`;
 
   const shouldUseCurrentSystemDateTimeTool =
@@ -191,7 +202,7 @@ export async function POST(request: Request) {
             reasoningEffort: "none",
           },
         },
-        system:
+        instructions:
           "You compress earlier chat history for a follow-up AI request. Preserve facts, decisions, constraints, and unresolved user intent. Do not answer the user.",
         prompt: buildConversationSummaryPrompt(messagesToSummarize),
       });
@@ -212,7 +223,7 @@ export async function POST(request: Request) {
         reasoningEffort,
       },
     },
-    system,
+    instructions: system,
     messages: modelMessages,
     tools: {
       getCurrentSystemDateTime: tool({
@@ -230,10 +241,11 @@ export async function POST(request: Request) {
     toolChoice: shouldUseCurrentSystemDateTimeTool
       ? { type: "tool", toolName: "getCurrentSystemDateTime" }
       : undefined,
-    stopWhen: stepCountIs(2),
+    stopWhen: isStepCount(2),
   });
 
-  return result.toUIMessageStreamResponse({
+  const stream = toUIMessageStream({
+    stream: result.stream,
     originalMessages: messages as UIMessage[],
     messageMetadata: ({ part }) => {
       if (part.type === "finish") {
@@ -241,4 +253,6 @@ export async function POST(request: Request) {
       }
     },
   });
+
+  return createUIMessageStreamResponse({ stream });
 }

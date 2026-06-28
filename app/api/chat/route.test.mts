@@ -52,13 +52,30 @@ test("chat route uses persisted session summary state before runtime compaction"
   );
 });
 
+test("chat route appends expert-requested skill instructions", () => {
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("./route.ts", import.meta.url)),
+    "utf8"
+  );
+
+  assert.match(
+    routeSource,
+    /import\s+\{[\s\S]*appendChatSkillInstructions,[\s\S]*loadChatSkillsForPrompt,[\s\S]*}\s+from\s+"@\/lib\/botchat\/skills"/
+  );
+  assert.match(
+    routeSource,
+    /appendChatSkillInstructions\(\s*system,\s*await loadChatSkillsForPrompt\(system\)\s*\)/
+  );
+});
+
 test("chat route attaches final total token usage to assistant message metadata", () => {
   const routeSource = readFileSync(
     fileURLToPath(new URL("./route.ts", import.meta.url)),
     "utf8"
   );
 
-  assert.match(routeSource, /toUIMessageStreamResponse\(\{/);
+  assert.match(routeSource, /toUIMessageStream\(\{/);
+  assert.match(routeSource, /createUIMessageStreamResponse\(\{\s*stream\s*}\)/);
   assert.match(routeSource, /messageMetadata:\s*\(\{\s*part\s*}\)/);
   assert.match(routeSource, /part\.type\s*===\s*"finish"/);
   assert.match(routeSource, /totalTokens:\s*part\.totalUsage\.totalTokens/);

@@ -14,7 +14,7 @@ When working in this repo, optimize for:
 
 - `Next.js 16` with App Router
 - `React 19`
-- `AI SDK 6` with `@ai-sdk/react` and `@ai-sdk/openai`
+- `AI SDK 7` with `@ai-sdk/react` and `@ai-sdk/openai`
 - `Supabase` for data storage, expert/session/message persistence, and attachment storage
 - `Tailwind CSS v4`
 - `Radix UI`

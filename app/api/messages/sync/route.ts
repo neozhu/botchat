@@ -69,7 +69,7 @@ async function buildSessionTitle(titleSource: string) {
           reasoningEffort: "none",
         },
       },
-      system:
+      instructions:
         "You write concise chat session titles. Preserve the user's intent. Do not answer the user.",
       prompt: buildSessionTitlePrompt(titleSource),
     });
@@ -99,7 +99,7 @@ async function buildPersistentConversationSummary(
         reasoningEffort: "none",
       },
     },
-    system:
+    instructions:
       "You update a rolling compressed summary of earlier chat history. Preserve facts, decisions, constraints, and unresolved user intent. Do not answer the user.",
     prompt: buildRollingConversationSummaryPrompt(
       previousSummary,

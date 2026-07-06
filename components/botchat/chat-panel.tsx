@@ -267,9 +267,11 @@ const MessageBubble = memo(function MessageBubble({
                   "[&_h1]:text-lg [&_h1]:font-semibold [&_h1]:mb-3",
                   "[&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-2",
                   "[&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2",
+                  "[&_[data-streamdown=blockquote]]:!my-4 [&_[data-streamdown=blockquote]]:!rounded-xl [&_[data-streamdown=blockquote]]:!border-l-0 [&_[data-streamdown=blockquote]]:!p-4 [&_[data-streamdown=blockquote]]:shadow-[0_18px_42px_-20px_rgba(9,8,35,0.75)]",
+                  "[&_[data-streamdown=blockquote]_p]:!mb-3 [&_[data-streamdown=blockquote]_p:last-child]:!mb-0",
                   isUser
-                    ? "[&_:not(pre)>code]:bg-black/5 [&_img]:border-black/10 [&_ul>li:before]:text-black/60"
-                    : "[&_:not(pre)>code]:bg-white/15 [&_img]:border-white/15 [&_ul>li:before]:text-white/70"
+                    ? "[&_:not(pre)>code]:bg-black/5 [&_img]:border-black/10 [&_ul>li:before]:text-black/60 [&_[data-streamdown=blockquote]]:!bg-slate-950/85 [&_[data-streamdown=blockquote]]:!text-white/90 [&_[data-streamdown=blockquote]_*]:!text-white/90 [&_[data-streamdown=blockquote]_.font-semibold]:!text-white"
+                    : "[&_:not(pre)>code]:bg-white/15 [&_img]:border-white/15 [&_ul>li:before]:text-white/70 [&_[data-streamdown=blockquote]]:!bg-[linear-gradient(135deg,rgba(8,6,28,0.48),rgba(7,10,30,0.62))] [&_[data-streamdown=blockquote]]:!text-white/90 [&_[data-streamdown=blockquote]_*]:!text-white/90 [&_[data-streamdown=blockquote]_.font-semibold]:!text-white"
                 )}
               >
                 {text}

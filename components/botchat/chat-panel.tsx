@@ -268,8 +268,8 @@ const MessageBubble = memo(function MessageBubble({
                   "[&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-2",
                   "[&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2",
                   isUser
-                    ? "[&_:not(pre)>code]:bg-black/5 [&_img]:border-black/10 [&_ul>li:before]:text-black/60"
-                    : "[&_:not(pre)>code]:bg-white/15 [&_img]:border-white/15 [&_ul>li:before]:text-white/70"
+                    ? "[&_:not(pre)>code]:bg-black/5 [&_img]:border-black/10 [&_ul>li:before]:text-black/60 [&_[data-streamdown=blockquote]]:!border-l-foreground/25 [&_[data-streamdown=blockquote]]:!bg-black/5 [&_[data-streamdown=blockquote]]:!text-foreground/80 [&_[data-streamdown=blockquote]_*]:!text-foreground/80 [&_[data-streamdown=blockquote]_.font-semibold]:!text-foreground"
+                    : "[&_:not(pre)>code]:bg-white/15 [&_img]:border-white/15 [&_ul>li:before]:text-white/70 [&_[data-streamdown=blockquote]]:!border-l-white/45 [&_[data-streamdown=blockquote]]:!bg-white/12 [&_[data-streamdown=blockquote]]:!text-white/85 [&_[data-streamdown=blockquote]_*]:!text-white/85 [&_[data-streamdown=blockquote]_.font-semibold]:!text-white"
                 )}
               >
                 {text}

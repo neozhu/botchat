@@ -100,15 +100,15 @@ const DEFAULT_SESSION_TITLE = "New chat";
 export default function BotchatDashboard({
   initialData,
 }: BotchatDashboardProps) {
-  const initialSessionIdRef = useRef(initialData.activeSessionId);
-  const initialMessagesRef = useRef(initialData.messages);
+  const [initialSessionId] = useState(() => initialData.activeSessionId);
+  const [initialMessages] = useState(() => initialData.messages);
   const initialSessionMessageCacheEntries: [string, SessionMessageCacheEntry][] =
-    initialData.activeSessionId
+    initialSessionId
       ? [
           [
-            initialData.activeSessionId,
+            initialSessionId,
             {
-              messages: initialData.messages,
+              messages: initialMessages,
               messageTimestamps: initialData.messageTimestamps,
             },
           ],
@@ -121,12 +121,19 @@ export default function BotchatDashboard({
     Map<string, Promise<SessionMessageCacheEntry | null>>
   >(new Map());
   const savedMessageIdsRef = useRef<Set<string>>(
-    new Set(initialData.messages.map((message) => message.id))
+    new Set(initialMessages.map((message) => message.id))
   );
   const savedMessageFingerprintsRef = useRef<Map<string, string>>(
-    messageFingerprints(initialData.messages)
+    messageFingerprints(initialMessages)
   );
   const messagesSessionIdRef = useRef<string | null>(initialData.activeSessionId);
+  const [renderedMessagesSessionId, setRenderedMessagesSessionId] = useState<string | null>(
+    () => initialData.activeSessionId
+  );
+  const setCurrentMessagesSessionId = useCallback((sessionId: string | null) => {
+    messagesSessionIdRef.current = sessionId;
+    setRenderedMessagesSessionId(sessionId);
+  }, []);
   const generationSessionIdRef = useRef<string | null>(null);
   const inFlightAbortRef = useRef<AbortController | null>(null);
   const sessionLoadTokenRef = useRef(0);
@@ -156,8 +163,8 @@ export default function BotchatDashboard({
     () => initialData.activeSessionId
   );
   const chatBootstrapMessages =
-    activeSessionId && activeSessionId === initialSessionIdRef.current
-      ? initialMessagesRef.current
+    activeSessionId && activeSessionId === initialSessionId
+      ? initialMessages
       : [];
 
   const { messages, sendMessage, status, setMessages, stop } = useChat({
@@ -190,8 +197,6 @@ export default function BotchatDashboard({
       );
     },
   });
-  const renderedMessagesSessionId = messagesSessionIdRef.current;
-
   const [input, setInput] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -209,7 +214,7 @@ export default function BotchatDashboard({
 
   const applySessionMessages = useCallback(
     (sessionId: string, cacheEntry: SessionMessageCacheEntry) => {
-      messagesSessionIdRef.current = sessionId;
+      setCurrentMessagesSessionId(sessionId);
       savedMessageIdsRef.current = new Set(
         cacheEntry.messages.map((message) => message.id)
       );
@@ -219,7 +224,7 @@ export default function BotchatDashboard({
       setMessageTimestamps(cacheEntry.messageTimestamps);
       setMessages(cacheEntry.messages);
     },
-    [setMessages]
+    [setCurrentMessagesSessionId, setMessages]
   );
 
   const isSessionMessageCacheStale = (
@@ -327,7 +332,7 @@ export default function BotchatDashboard({
 
     if (token !== sessionLoadTokenRef.current) return;
 
-    messagesSessionIdRef.current = null;
+    setCurrentMessagesSessionId(null);
     savedMessageIdsRef.current = new Set();
     savedMessageFingerprintsRef.current = new Map();
     setPendingFiles([]);
@@ -412,7 +417,7 @@ export default function BotchatDashboard({
     if (!nextSession) {
       setActiveSessionId(null);
       setIsLoadingSessionMessages(false);
-      messagesSessionIdRef.current = null;
+      setCurrentMessagesSessionId(null);
       savedMessageIdsRef.current = new Set();
       savedMessageFingerprintsRef.current = new Map();
       setMessages([]);
@@ -458,7 +463,7 @@ export default function BotchatDashboard({
       messageTimestamps: {},
     });
     setActiveSessionId(session.id);
-    messagesSessionIdRef.current = session.id;
+    setCurrentMessagesSessionId(session.id);
     savedMessageIdsRef.current = new Set();
     savedMessageFingerprintsRef.current = new Map();
     setMessages([]);
@@ -520,7 +525,7 @@ export default function BotchatDashboard({
       setActiveSessionId(null);
       setIsLoadingSessionMessages(false);
       setActiveExpertId(nextExperts[0]?.id ?? null);
-      messagesSessionIdRef.current = null;
+      setCurrentMessagesSessionId(null);
       savedMessageIdsRef.current = new Set();
       savedMessageFingerprintsRef.current = new Map();
       setMessages([]);
@@ -572,7 +577,7 @@ export default function BotchatDashboard({
         });
         setActiveSessionId(session.id);
         setActiveExpertId(session.expert_id);
-        messagesSessionIdRef.current = session.id;
+        setCurrentMessagesSessionId(session.id);
         savedMessageIdsRef.current = new Set();
         savedMessageFingerprintsRef.current = new Map();
         setMessages([]);
@@ -587,24 +592,33 @@ export default function BotchatDashboard({
     return () => {
       cancelled = true;
     };
-  }, [activeExpertId, activeSessionId, experts, sessions.length, setMessages]);
+  }, [
+    activeExpertId,
+    activeSessionId,
+    experts,
+    sessions.length,
+    setCurrentMessagesSessionId,
+    setMessages,
+  ]);
 
   useEffect(() => {
     if (messages.length === 0) return;
 
-    setMessageTimestamps((prev) => {
-      let changed = false;
-      const now = new Date().toISOString();
-      const next = { ...prev };
+    queueMicrotask(() => {
+      setMessageTimestamps((prev) => {
+        let changed = false;
+        const now = new Date().toISOString();
+        const next = { ...prev };
 
-      for (const message of messages) {
-        if (!next[message.id]) {
-          next[message.id] = now;
-          changed = true;
+        for (const message of messages) {
+          if (!next[message.id]) {
+            next[message.id] = now;
+            changed = true;
+          }
         }
-      }
 
-      return changed ? next : prev;
+        return changed ? next : prev;
+      });
     });
   }, [messages]);
 
@@ -796,7 +810,7 @@ export default function BotchatDashboard({
       try {
         setIsUploadingAttachments(hasFiles);
         generationSessionIdRef.current = sessionIdAtSend;
-        messagesSessionIdRef.current = sessionIdAtSend;
+        setCurrentMessagesSessionId(sessionIdAtSend);
 
         const uploadedFiles = hasFiles
           ? await uploadAttachments(sessionIdAtSend, filesSnapshot, abort.signal)

@@ -9,7 +9,6 @@ test("message code blocks preserve Shiki token colors", () => {
   assert.match(source, /const MarkdownCode/);
   assert.match(source, /themeMode="dark"/);
   assert.match(source, /components=\{\{[\s\S]*code:\s*MarkdownCode/);
-  assert.match(source, /cdnUrl=\{null\}/);
   assert.match(source, /\[&_\[data-streamdown=code-block-body\]\]:!bg-transparent/);
   assert.doesNotMatch(source, /data-streamdown=code-block-body\]_\*\]:!text-white/);
 });

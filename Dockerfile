@@ -1,13 +1,23 @@
 # syntax=docker/dockerfile:1.7
 
-FROM oven/bun:1 AS deps
+FROM node:24-bookworm-slim AS base
+ENV DEBIAN_FRONTEND=noninteractive
+RUN set -eux; \
+    rm -rf /var/lib/apt/lists/*; \
+    apt-get update -o Acquire::Retries=5; \
+    apt-get install -y --no-install-recommends -o Acquire::Retries=5 ca-certificates openssl; \
+    update-ca-certificates; \
+    npm install -g bun@1; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+
+FROM base AS deps
 
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
-FROM oven/bun:1 AS builder
-WORKDIR /app
+FROM base AS builder
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -21,8 +31,7 @@ ENV PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=$PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT
 
 RUN bun run build
 
-FROM oven/bun:1 AS runner
-WORKDIR /app
+FROM base AS runner
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -36,4 +45,4 @@ COPY --from=builder /app/skills ./skills
 COPY --from=builder /app/next.config.js ./next.config.js
 
 EXPOSE 3000
-CMD ["bun", "run", "start", "--", "-p", "3000", "-H", "0.0.0.0"]
+CMD ["npm", "run", "start", "--", "-p", "3000", "-H", "0.0.0.0"]

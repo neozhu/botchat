@@ -35,6 +35,7 @@ import {
   useState,
 } from "react";
 import { Streamdown } from "streamdown";
+import type { ExtraProps } from "streamdown";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -391,12 +392,11 @@ const MarkdownCode = ({
   );
 };
 
-const MarkdownPre = ({ children }: ComponentProps<"pre">) => children;
+const MarkdownPre = ({ children }: ComponentProps<"pre"> & ExtraProps) => children;
 
 export const MessageResponse = memo(
   ({ className, components, ...props }: MessageResponseProps) => (
     <Streamdown
-      cdnUrl={null}
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         "[&_[data-streamdown=code-block]]:border-white/25 [&_[data-streamdown=code-block]]:bg-[linear-gradient(135deg,rgba(8,6,28,0.48),rgba(7,10,30,0.62)),linear-gradient(135deg,var(--bot-gradient-start),var(--bot-gradient-end))] [&_[data-streamdown=code-block]]:text-white [&_[data-streamdown=code-block]]:shadow-[0_18px_42px_-20px_rgba(9,8,35,0.88)]",

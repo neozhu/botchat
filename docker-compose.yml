@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
+        NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org/}
         PUBLIC_SUPABASE_URL: ${PUBLIC_SUPABASE_URL}
         PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY}
     environment:

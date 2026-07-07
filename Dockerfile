@@ -7,10 +7,16 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
+
+
 FROM base AS deps
 
-COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci \
+    && npm install --no-save --ignore-scripts \
+        @tailwindcss/oxide-linux-x64-gnu@4.1.18 \
+        lightningcss-linux-x64-gnu@1.30.2
 
 FROM base AS builder
 
@@ -31,8 +37,9 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci --only=production; else npm install --only=production; fi
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
 
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public

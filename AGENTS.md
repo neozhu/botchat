@@ -109,17 +109,17 @@ Supabase assumptions in this repo:
 
 ## Common Commands
 
-- `bun dev`
-- `bun run build`
-- `bun start`
-- `bun lint`
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run lint`
 
 ## Verification Expectations
 
 Before claiming completion, run the narrowest relevant verification possible:
 
-- UI or TypeScript changes: `bun run build` if feasible
-- lint-sensitive changes: `bun lint`
+- UI or TypeScript changes: `npm run build` if feasible
+- lint-sensitive changes: `npm run lint`
 - focused prompt logic changes: run or update the existing test at [`app/api/experts/generate/prompt.test.mts`](D:\github\botchat\app\api\experts\generate\prompt.test.mts)
 
 If you could not run verification, say so explicitly.

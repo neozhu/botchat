@@ -55,8 +55,8 @@ Supabase admin (required for expert deletion to remove all linked sessions/messa
 ### 2) Run
 
 ```bash
-bun install
-bun dev
+npm install
+npm run dev
 ```
 
 Open `http://localhost:3000`.
@@ -102,7 +102,7 @@ Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_CONVERSATION
 ## Common scripts
 
 ```bash
-bun dev       # local dev
-bun run build # production build
-bun start     # run production server on :3000
+npm run dev       # local dev
+npm run build     # production build
+npm run start     # run production server on :3000
 ```

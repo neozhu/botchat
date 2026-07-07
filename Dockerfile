@@ -1,15 +1,11 @@
 # syntax=docker/dockerfile:1.7
 
 FROM node:24-bookworm-slim AS base
-ENV DEBIAN_FRONTEND=noninteractive
-RUN set -eux; \
-    rm -rf /var/lib/apt/lists/*; \
-    apt-get update -o Acquire::Retries=5; \
-    apt-get install -y --no-install-recommends -o Acquire::Retries=5 ca-certificates openssl; \
-    update-ca-certificates; \
-    npm install -g bun@1; \
-    apt-get clean; \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates openssl \
+    && update-ca-certificates \
+    && npm install -g bun@1 \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 FROM base AS deps

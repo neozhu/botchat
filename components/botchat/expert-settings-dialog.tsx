@@ -369,7 +369,7 @@ export function ExpertSettingsDialog({
   }, [experts]);
 
   useEffect(() => {
-    setIsClient(true);
+    queueMicrotask(() => setIsClient(true));
   }, []);
 
   const updateExperts = useCallback(
@@ -482,12 +482,14 @@ export function ExpertSettingsDialog({
   useEffect(() => {
     if (!open) return;
     if (providedExperts !== undefined) {
-      setIsLoading(false);
-      setError(null);
-      syncExperts(providedExperts);
+      queueMicrotask(() => {
+        setIsLoading(false);
+        setError(null);
+        syncExperts(providedExperts);
+      });
       return;
     }
-    void loadExperts();
+    queueMicrotask(() => void loadExperts());
   }, [loadExperts, open, providedExperts, syncExperts]);
 
   useEffect(() => {
@@ -495,8 +497,10 @@ export function ExpertSettingsDialog({
     preserveEmptySelectionRef.current = false;
     lastSyncedSelectedIdRef.current = null;
     hasPlayedListIntroRef.current = false;
-    setDeleteConfirmOpen(false);
-    stopListIntroAnimation();
+    queueMicrotask(() => {
+      setDeleteConfirmOpen(false);
+      stopListIntroAnimation();
+    });
   }, [open, stopListIntroAnimation]);
 
   useEffect(() => stopListIntroAnimation, [stopListIntroAnimation]);

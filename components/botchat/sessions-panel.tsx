@@ -110,13 +110,15 @@ export function SessionsPanel({
   useEffect(() => {
     if (!searchDialogOpen) return;
     if (!normalizedQuery) {
-      setSearchResults(null);
-      setIsSearching(false);
+      queueMicrotask(() => {
+        setSearchResults(null);
+        setIsSearching(false);
+      });
       return;
     }
 
     const abort = new AbortController();
-    setIsSearching(true);
+    queueMicrotask(() => setIsSearching(true));
 
     const timeout = setTimeout(() => {
       void (async () => {

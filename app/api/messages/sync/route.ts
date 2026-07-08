@@ -1,10 +1,6 @@
 import { generateText, type UIMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { getConversationSummaryModelId } from "@/lib/ai/openai";
-import {
-  buildRollingConversationSummaryPrompt,
-  selectMessagesForPersistentSummary,
-} from "@/lib/botchat/chat-context";
+import { persistRollingConversationSummary } from "@/lib/botchat/rolling-summary";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   SESSION_TITLE_MODEL_ID,
@@ -88,28 +84,6 @@ function rowToUiMessage(row: UnsummarizedMessageRow): UIMessage {
   };
 }
 
-async function buildPersistentConversationSummary(
-  previousSummary: string | null,
-  messagesToSummarize: UIMessage[]
-) {
-  const { text } = await generateText({
-    model: openai(getConversationSummaryModelId()),
-    providerOptions: {
-      openai: {
-        reasoningEffort: "none",
-      },
-    },
-    instructions:
-      "You update a rolling compressed summary of earlier chat history. Preserve facts, decisions, constraints, and unresolved user intent. Do not answer the user.",
-    prompt: buildRollingConversationSummaryPrompt(
-      previousSummary,
-      messagesToSummarize
-    ),
-  });
-
-  return text.trim();
-}
-
 async function persistRollingConversationSummaryIfNeeded(
   supabase: SupabaseServerClient,
   sessionId: string
@@ -144,37 +118,22 @@ async function persistRollingConversationSummaryIfNeeded(
       (row.role === "user" || row.role === "assistant") &&
       (typeof row.total_tokens === "number" || row.total_tokens === null)
   );
-  const rowsToSummarize =
-    selectMessagesForPersistentSummary(unsummarizedRows);
-  if (rowsToSummarize.length === 0) return null;
-
-  const summary = await buildPersistentConversationSummary(
+  const persistedSummary = await persistRollingConversationSummary({
+    supabase,
+    sessionId,
     previousSummary,
-    rowsToSummarize.map(rowToUiMessage)
-  );
+    messages: unsummarizedRows,
+    markerColumn: "id",
+    getMarkerKey: (row) => row.id,
+    toUiMessage: rowToUiMessage,
+  });
 
-  const summarizedAt = new Date().toISOString();
-  const summarizedMessageRowIds = rowsToSummarize.map((row) => row.id);
+  if (persistedSummary.summarizedMessageKeys.length === 0) return null;
 
-  const { error: summaryError } = await supabase
-    .from("chat_sessions")
-    .update({
-      context_summary: summary,
-      context_summary_updated_at: summarizedAt,
-    })
-    .eq("id", sessionId);
-
-  if (summaryError) throw new Error(summaryError.message);
-
-  const { error: markerError } = await supabase
-    .from("chat_messages")
-    .update({ summarized_at: summarizedAt })
-    .eq("session_id", sessionId)
-    .in("id", summarizedMessageRowIds);
-
-  if (markerError) throw new Error(markerError.message);
-
-  return { summary, summarizedAt };
+  return {
+    summary: persistedSummary.summary,
+    summarizedAt: persistedSummary.summarizedAt,
+  };
 }
 
 async function refreshSessionTotalTokens(

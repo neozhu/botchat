@@ -19,11 +19,10 @@ import {
 import {
   appendSavedConversationSummaryContext,
   buildConversationSummaryPrompt,
-  buildRollingConversationSummaryPrompt,
   filterSummarizedMessages,
   prepareChatModelContext,
-  selectMessagesForPersistentSummary,
 } from "@/lib/botchat/chat-context";
+import { persistRollingConversationSummary } from "@/lib/botchat/rolling-summary";
 import {
   appendChatSkillInstructions,
   loadChatSkillsForPrompt,
@@ -109,57 +108,6 @@ function buildCurrentSystemDateTimeContext() {
 - unixMs: ${currentDateTime.unixMs}
 
 Use this as the authoritative current date/time if the user asks about "now", "today", the current date, the current time, or the current time zone.`;
-}
-
-async function persistRequestRollingConversationSummaryIfNeeded(
-  supabase: SupabaseServerClient,
-  sessionId: string,
-  previousSummary: string | null,
-  messages: UIMessage[]
-) {
-  const rowsToSummarize = selectMessagesForPersistentSummary(messages);
-  if (rowsToSummarize.length === 0) {
-    return { summary: previousSummary, summarizedUiMessageIds: [] };
-  }
-
-  const { text } = await generateText({
-    model: openai(getConversationSummaryModelId()),
-    providerOptions: {
-      openai: {
-        reasoningEffort: "none",
-      },
-    },
-    instructions:
-      "You update a rolling compressed summary of earlier chat history. Preserve facts, decisions, constraints, and unresolved user intent. Do not answer the user.",
-    prompt: buildRollingConversationSummaryPrompt(
-      previousSummary,
-      rowsToSummarize
-    ),
-  });
-
-  const summary = text.trim();
-  const summarizedAt = new Date().toISOString();
-  const summarizedUiMessageIds = rowsToSummarize.map((message) => message.id);
-
-  const { error: summaryError } = await supabase
-    .from("chat_sessions")
-    .update({
-      context_summary: summary,
-      context_summary_updated_at: summarizedAt,
-    })
-    .eq("id", sessionId);
-
-  if (summaryError) throw new Error(summaryError.message);
-
-  const { error: markerError } = await supabase
-    .from("chat_messages")
-    .update({ summarized_at: summarizedAt })
-    .eq("session_id", sessionId)
-    .in("ui_message_id", summarizedUiMessageIds);
-
-  if (markerError) throw new Error(markerError.message);
-
-  return { summary, summarizedUiMessageIds };
 }
 
 export async function POST(request: Request) {
@@ -252,17 +200,20 @@ export async function POST(request: Request) {
   if (sessionId && supabase) {
     try {
       const persistedSummary =
-        await persistRequestRollingConversationSummaryIfNeeded(
+        await persistRollingConversationSummary({
           supabase,
           sessionId,
-          contextSummary,
-          contextMessages
-        );
+          previousSummary: contextSummary,
+          messages: contextMessages,
+          markerColumn: "ui_message_id",
+          getMarkerKey: (message) => message.id,
+          toUiMessage: (message) => message,
+        });
 
       contextSummary = persistedSummary.summary;
       summarizedUiMessageIds = new Set([
         ...summarizedUiMessageIds,
-        ...persistedSummary.summarizedUiMessageIds,
+        ...persistedSummary.summarizedMessageKeys,
       ]);
       contextMessages = filterSummarizedMessages(
         messages as UIMessage[],

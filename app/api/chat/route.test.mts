@@ -58,14 +58,12 @@ test("chat route persists a rolling request summary before runtime compaction", 
     "utf8"
   );
 
-  assert.match(routeSource, /selectMessagesForPersistentSummary/);
-  assert.match(routeSource, /buildRollingConversationSummaryPrompt/);
   assert.match(
     routeSource,
-    /persistRequestRollingConversationSummaryIfNeeded\([\s\S]*contextMessages[\s\S]*\)/
+    /persistRollingConversationSummary\(\{[\s\S]*messages:\s*contextMessages[\s\S]*markerColumn:\s*"ui_message_id"/
   );
-  assert.match(routeSource, /context_summary:\s*summary/);
-  assert.match(routeSource, /\.in\("ui_message_id", summarizedUiMessageIds\)/);
+  assert.match(routeSource, /getMarkerKey:\s*\(message\)\s*=>\s*message\.id/);
+  assert.match(routeSource, /summarizedMessageKeys/);
 });
 
 test("chat route appends expert-requested skill instructions", () => {

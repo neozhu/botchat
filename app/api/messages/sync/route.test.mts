@@ -30,31 +30,15 @@ test("message sync persists rolling conversation summaries after message upsert"
 
   assert.match(
     routeSource,
-    /getConversationSummaryModelId/
-  );
-  assert.match(
-    routeSource,
-    /buildRollingConversationSummaryPrompt/
-  );
-  assert.match(
-    routeSource,
-    /selectMessagesForPersistentSummary/
-  );
-  assert.match(
-    routeSource,
     /\.select\("id, context_summary"\)[\s\S]*\.from\("chat_messages"\)[\s\S]*\.is\("summarized_at", null\)/
   );
   assert.match(
     routeSource,
-    /context_summary:\s*summary/
+    /persistRollingConversationSummary\(\{[\s\S]*messages:\s*unsummarizedRows[\s\S]*markerColumn:\s*"id"/
   );
   assert.match(
     routeSource,
-    /context_summary_updated_at:\s*summarizedAt/
-  );
-  assert.match(
-    routeSource,
-    /\.update\(\{\s*summarized_at:\s*summarizedAt\s*}\)[\s\S]*\.in\("id", summarizedMessageRowIds\)/
+    /getMarkerKey:\s*\(row\)\s*=>\s*row\.id/
   );
   assert.doesNotMatch(routeSource, /if\s*\(\s*!summary\s*\)\s*return\s+null/);
 });

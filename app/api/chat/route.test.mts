@@ -52,6 +52,22 @@ test("chat route uses persisted session summary state before runtime compaction"
   );
 });
 
+test("chat route persists a rolling request summary before runtime compaction", () => {
+  const routeSource = readFileSync(
+    fileURLToPath(new URL("./route.ts", import.meta.url)),
+    "utf8"
+  );
+
+  assert.match(routeSource, /selectMessagesForPersistentSummary/);
+  assert.match(routeSource, /buildRollingConversationSummaryPrompt/);
+  assert.match(
+    routeSource,
+    /persistRequestRollingConversationSummaryIfNeeded\([\s\S]*contextMessages[\s\S]*\)/
+  );
+  assert.match(routeSource, /context_summary:\s*summary/);
+  assert.match(routeSource, /\.in\("ui_message_id", summarizedUiMessageIds\)/);
+});
+
 test("chat route appends expert-requested skill instructions", () => {
   const routeSource = readFileSync(
     fileURLToPath(new URL("./route.ts", import.meta.url)),

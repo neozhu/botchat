@@ -17,6 +17,9 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      TTS_API_KEY: ${TTS_API_KEY}
+      TTS_API_URL: ${TTS_API_URL}
+      TTS_VOICE: ${TTS_VOICE}
     ports:
       - "3202:3000"
     volumes:

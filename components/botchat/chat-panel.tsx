@@ -54,11 +54,13 @@ import {
   Globe,
   Info,
   Loader2,
+  AudioLines,
   MessageCircle,
   Mic,
   MoreHorizontal,
   Paperclip,
   Send,
+  Volume2,
   Wand2,
   X,
 } from "lucide-react";
@@ -86,6 +88,8 @@ type ChatTimelineItem =
       key: string;
       message: UIMessage;
     };
+
+type SpeechState = "idle" | "loading" | "playing";
 
 export type ChatPanelProps = {
   botName: string;
@@ -183,7 +187,11 @@ const MessageBubble = memo(function MessageBubble({
   const hasText = text.trim().length > 0;
   const canCopyResponse = !isUser && hasText;
   const [copied, setCopied] = useState(false);
+  const [speechState, setSpeechState] = useState<SpeechState>("idle");
   const resetCopyStateTimeoutRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const speechAbortControllerRef = useRef<AbortController | null>(null);
   const parts = (message as UIMessage).parts ?? [];
   const fileParts = parts.filter((part) => part.type === "file") as Array<{
     type: "file";
@@ -197,8 +205,27 @@ const MessageBubble = memo(function MessageBubble({
       if (resetCopyStateTimeoutRef.current) {
         window.clearTimeout(resetCopyStateTimeoutRef.current);
       }
+      speechAbortControllerRef.current?.abort();
+      audioRef.current?.pause();
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+      }
     };
   }, []);
+
+  const resetSpeech = () => {
+    speechAbortControllerRef.current?.abort();
+    speechAbortControllerRef.current = null;
+    audioRef.current?.pause();
+    audioRef.current = null;
+
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+
+    setSpeechState("idle");
+  };
 
   const handleCopy = async () => {
     if (!text.trim()) return;
@@ -219,7 +246,73 @@ const MessageBubble = memo(function MessageBubble({
     }
   };
 
+  const handleReadResponse = async () => {
+    const input = text.trim();
+    if (!input || speechState !== "idle") return;
+
+    const abortController = new AbortController();
+    speechAbortControllerRef.current = abortController;
+    setSpeechState("loading");
+
+    try {
+      const response = await fetch("/api/audio/speech", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ input }),
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS request failed with status ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      audioUrlRef.current = audioUrl;
+      audioRef.current = audio;
+
+      const handlePlaybackDone = () => {
+        if (audioRef.current === audio) {
+          audioRef.current = null;
+        }
+
+        if (audioUrlRef.current === audioUrl) {
+          URL.revokeObjectURL(audioUrl);
+          audioUrlRef.current = null;
+        }
+
+        setSpeechState("idle");
+      };
+
+      audio.addEventListener("ended", handlePlaybackDone, { once: true });
+      audio.addEventListener("error", handlePlaybackDone, { once: true });
+      setSpeechState("playing");
+      await audio.play();
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        console.error("Failed to play assistant response", error);
+      }
+      resetSpeech();
+    } finally {
+      if (speechAbortControllerRef.current === abortController) {
+        speechAbortControllerRef.current = null;
+      }
+    }
+  };
+
   if (!hasText && fileParts.length === 0) return null;
+
+  const speechLabel =
+    speechState === "loading"
+      ? "Preparing speech"
+      : speechState === "playing"
+        ? "Reading response aloud"
+        : "Read response aloud";
+  const isSpeechActive = speechState !== "idle";
 
   return (
     <div
@@ -319,7 +412,28 @@ const MessageBubble = memo(function MessageBubble({
         </div>
 
         {canCopyResponse ? (
-          <div className="absolute right-2 bottom-2">
+          <div className="absolute right-2 bottom-2 flex items-center gap-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label={speechLabel}
+              disabled={isSpeechActive}
+              className={cn(
+                "h-7 w-7 rounded-full border border-white/12 bg-black/20 text-white/80 opacity-0 shadow-sm backdrop-blur-sm transition-opacity duration-150 pointer-events-none group-hover/message:opacity-100 group-hover/message:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:bg-black/30 hover:text-white [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 disabled:pointer-events-none disabled:opacity-100",
+                isSpeechActive &&
+                  "opacity-100 pointer-events-auto border-[var(--accent-line)]/40 bg-white/90 text-[var(--accent-line)] hover:bg-white"
+              )}
+              onClick={() => void handleReadResponse()}
+            >
+              {speechState === "loading" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : speechState === "playing" ? (
+                <AudioLines className="h-3.5 w-3.5" />
+              ) : (
+                <Volume2 className="h-3.5 w-3.5" />
+              )}
+            </Button>
             <Button
               type="button"
               size="icon"

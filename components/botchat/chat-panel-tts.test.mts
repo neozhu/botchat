@@ -11,5 +11,13 @@ test("assistant message actions include text to speech states", () => {
   assert.match(source, /Reading response aloud/);
   assert.match(source, /fetch\("\/api\/audio\/speech"/);
   assert.match(source, /new Audio\(audioUrl\)/);
-  assert.match(source, /AudioLines/);
+  assert.match(source, /function SpeechWaveformIcon/);
+  assert.match(source, /useReducedMotion\(\)/);
+  assert.match(source, /<svg/);
+  assert.match(source, /<motion\.path/);
+  assert.match(source, /x: \[0, -14\]/);
+  assert.match(source, /repeat: Infinity/);
+  assert.match(source, /<SpeechWaveformIcon \/>/);
+  assert.doesNotMatch(source, /SPEECH_WAVEFORM_BAR_HEIGHTS/);
+  assert.doesNotMatch(source, /AudioLines/);
 });

@@ -10,7 +10,7 @@ import type {
 } from "react";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   Conversation,
   ConversationContent,
@@ -54,7 +54,6 @@ import {
   Globe,
   Info,
   Loader2,
-  AudioLines,
   MessageCircle,
   Mic,
   MoreHorizontal,
@@ -172,6 +171,37 @@ function ToolbarIcon({
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
+  );
+}
+
+function SpeechWaveformIcon() {
+  const shouldReduceMotion = useReducedMotion();
+
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 14 14"
+      fill="none"
+      className="h-3.5 w-3.5 overflow-hidden"
+    >
+      <motion.path
+        d="M0 7H2L3 6L4 9L5.5 2L7 12L8.5 7H14M14 7H16L17 6L18 9L19.5 2L21 12L22.5 7H28"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        animate={shouldReduceMotion ? undefined : { x: [0, -14] }}
+        transition={
+          shouldReduceMotion
+            ? undefined
+            : {
+                duration: 1.15,
+                ease: "linear",
+                repeat: Infinity,
+              }
+        }
+      />
+    </svg>
   );
 }
 
@@ -429,7 +459,7 @@ const MessageBubble = memo(function MessageBubble({
               {speechState === "loading" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : speechState === "playing" ? (
-                <AudioLines className="h-3.5 w-3.5" />
+                <SpeechWaveformIcon />
               ) : (
                 <Volume2 className="h-3.5 w-3.5" />
               )}

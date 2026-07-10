@@ -28,7 +28,7 @@
 - Consumes: `ExpertPromptInput` with `name`, `agentName`, `description`, and `languageHint` strings.
 - Produces: `buildExpertGenerationPrompt(input: ExpertPromptInput): string` for `app/api/experts/generate/route.ts`.
 
-- [ ] **Step 1: Update tests to require the GPT-5.6 contract**
+- [x] **Step 1: Update tests to require the GPT-5.6 contract**
 
 Replace the outdated model-neutral and GPT-5.5 assertions with focused assertions for the complete GPT-5.6 structure:
 
@@ -73,17 +73,17 @@ test("buildExpertGenerationPrompt delimits persona fields as untrusted data", ()
 
 Keep the existing tests for missing language hints, weak persona input, proactive collaboration, and suggestion-question perspective. Update only wording-dependent assertions to match the new contract.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
 ```powershell
-node --test app/api/experts/generate/prompt.test.mts
+node --experimental-strip-types --test app/api/experts/generate/prompt.test.mts
 ```
 
 Expected: FAIL because the current prompt does not mention GPT-5.6, does not separate Personality from Collaboration Style, and does not delimit `<persona_input>`.
 
-- [ ] **Step 3: Implement the complete GPT-5.6 prompt**
+- [x] **Step 3: Implement the complete GPT-5.6 prompt**
 
 Replace the returned instruction array in `buildExpertGenerationPrompt` with this behavior-complete contract:
 
@@ -140,17 +140,17 @@ return [
   .join("\n");
 ```
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+- [x] **Step 4: Run the focused test and verify GREEN**
 
 Run:
 
 ```powershell
-node --test app/api/experts/generate/prompt.test.mts
+node --experimental-strip-types --test app/api/experts/generate/prompt.test.mts
 ```
 
-Expected: all prompt-generation tests PASS with no warnings.
+Expected: all prompt-generation tests PASS. Existing Node type-stripping and module-type warnings may remain.
 
-- [ ] **Step 5: Run lint and production build**
+- [x] **Step 5: Run lint and production build**
 
 Run:
 
@@ -161,7 +161,7 @@ npm run build
 
 Expected: both commands exit with code 0. If an unrelated pre-existing failure occurs, record its exact output and verify the focused test independently.
 
-- [ ] **Step 6: Review and commit the implementation**
+- [x] **Step 6: Review and commit the implementation**
 
 Run:
 

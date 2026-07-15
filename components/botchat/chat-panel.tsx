@@ -39,6 +39,7 @@ import {
 } from "@/lib/botchat/chat-clipboard";
 import { getComposerTextareaSizing } from "@/lib/botchat/chat-composer";
 import { formatTimelineDay, getTimelineDayKey } from "@/lib/botchat/chat-timeline";
+import { VoiceInputButton } from "@/components/botchat/VoiceInputButton";
 import {
   THINKING_BUBBLE_DOT_CLASSNAMES,
   THINKING_BUBBLE_TEXT,
@@ -55,7 +56,6 @@ import {
   Info,
   Loader2,
   MessageCircle,
-  Mic,
   MoreHorizontal,
   Paperclip,
   Send,
@@ -1131,7 +1131,7 @@ export function ChatPanel({
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <ToolbarIcon icon={MessageCircle} label="Message type" />
-                    <ToolbarIcon icon={Mic} label="Voice note" />
+                    <VoiceInputButton disabled={!canSend} />
                     <ToolbarIcon
                       icon={Brain}
                       label={isHighReasoning ? "Reasoning: High" : "Reasoning: Low"}
@@ -1158,11 +1158,12 @@ export function ChatPanel({
                   </div>
                   <Button
                     type="submit"
+                    size="icon"
+                    aria-label="Send message"
                     disabled={!canSend}
-                    className="h-9 rounded-full bg-black px-5 text-sm text-white hover:bg-black/90 disabled:opacity-60"
+                    className="h-9 w-9 rounded-full bg-black text-white hover:bg-black/90 disabled:opacity-60"
                   >
-                    Send
-                    <Send className="ml-2 h-4 w-4" />
+                    <Send className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

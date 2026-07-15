@@ -1,0 +1,110 @@
+.voiceControl {
+  --voice-purple: #7668f7;
+  --voice-purple-soft: #efedff;
+  --voice-record: #f34f6b;
+  --voice-record-soft: #fff5f7;
+  --voice-record-border: #ffd4dc;
+  --voice-hover: #f3f4f7;
+
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  vertical-align: middle;
+  transition: width 260ms cubic-bezier(0.2, 0.8, 0.2, 1), background 180ms ease,
+    border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.recording {
+  width: auto;
+  background: var(--voice-record-soft);
+  border-color: var(--voice-record-border);
+  box-shadow: 0 6px 15px rgb(243 79 107 / 9%);
+}
+
+.voiceTrigger {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: inline-grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #111827;
+  background: transparent;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.voiceTrigger:hover:not(:disabled) { background: var(--voice-hover); }
+.voiceTrigger:active:not(:disabled) { transform: scale(0.94); }
+.voiceTrigger:focus-visible,
+.stopRecording:focus-visible { outline: 3px solid rgb(118 104 247 / 25%); outline-offset: 2px; }
+.voiceTrigger svg { width: 14px; height: 14px; }
+.recording .voiceTrigger { color: var(--voice-purple); background: var(--voice-purple-soft); }
+
+.recordingContent {
+  width: max-content;
+  min-width: 0;
+  height: 30px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 5px 0 4px;
+  opacity: 0;
+  transform: translateX(-5px);
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 140ms ease 50ms, transform 190ms ease 35ms;
+}
+
+.recording .recordingContent { opacity: 1; transform: translateX(0); pointer-events: auto; }
+.recordingDot { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: var(--voice-record); animation: recordingDotPulse 1.25s ease-out infinite; }
+.recordingTime { flex: 0 0 auto; color: #363b48; font-size: 10.5px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; }
+.waveform { height: 16px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 2px; overflow: hidden; }
+.waveform span { width: 2px; height: 14px; flex: 0 0 2px; display: block; border-radius: 999px; background: var(--voice-record); opacity: var(--voice-opacity, 0.55); transform: scaleY(var(--voice-level, 0.28)); transition: transform 105ms ease-in-out, opacity 105ms ease-in-out; will-change: transform, opacity; }
+
+.stopRecording {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--voice-record);
+  background: rgb(243 79 107 / 12%);
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.stopRecording:hover { background: rgb(243 79 107 / 20%); }
+.stopRecording:active { transform: scale(0.92); }
+.stopRecording > span { width: 6px; height: 6px; display: block; border-radius: 2px; background: currentColor; }
+.disabled { opacity: 0.5; }
+.disabled .voiceTrigger,
+.disabled .stopRecording { cursor: not-allowed; }
+
+@keyframes recordingDotPulse {
+  0% { box-shadow: 0 0 0 0 rgb(243 79 107 / 36%); }
+  70% { box-shadow: 0 0 0 5px rgb(243 79 107 / 0%); }
+  100% { box-shadow: 0 0 0 0 rgb(243 79 107 / 0%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voiceControl,
+  .recordingContent,
+  .waveform span { transition-duration: 1ms; }
+  .recordingDot { animation: none; }
+}

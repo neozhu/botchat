@@ -20,6 +20,8 @@ services:
       TTS_API_KEY: ${TTS_API_KEY}
       TTS_API_URL: ${TTS_API_URL}
       TTS_VOICE: ${TTS_VOICE}
+      ASR_API_KEY: ${ASR_API_KEY}
+      ASR_API_URL: ${ASR_API_URL}
     ports:
       - "3202:3000"
     volumes:

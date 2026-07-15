@@ -31,6 +31,8 @@ export interface VoiceInputButtonProps {
   onRecordingChange?: (recording: boolean) => void;
   onStart?: () => void;
   onStop?: (elapsedSeconds: number) => void;
+  onTranscription?: (text: string) => void;
+  onError?: (error: Error) => void;
 }
 
 function formatElapsedTime(totalSeconds: number): string {
@@ -52,6 +54,8 @@ export function VoiceInputButton({
   onRecordingChange,
   onStart,
   onStop,
+  onTranscription,
+  onError,
 }: VoiceInputButtonProps) {
   const isControlled = recording !== undefined;
   const [internalRecording, setInternalRecording] = useState(defaultRecording);
@@ -62,19 +66,134 @@ export function VoiceInputButton({
   );
   const startedAtRef = useRef<number | null>(null);
   const elapsedSecondsRef = useRef(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+
+  const reportError = useCallback(
+    (error: unknown) => {
+      const nextError =
+        error instanceof Error ? error : new Error("Voice input failed.");
+      console.error("Voice input failed", nextError);
+      onError?.(nextError);
+    },
+    [onError]
+  );
+
+  const transcribeAudio = useCallback(
+    async (audio: Blob) => {
+      const formData = new FormData();
+      formData.append("file", audio, "voice-input.webm");
+
+      const response = await fetch("/api/audio/transcriptions", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`ASR request failed with status ${response.status}`);
+      }
+
+      const transcription = (await response.json()) as { text?: unknown };
+      const text =
+        typeof transcription.text === "string" ? transcription.text.trim() : "";
+
+      if (text) onTranscription?.(text);
+    },
+    [onTranscription]
+  );
+
+  const startRecording = useCallback(async () => {
+    if (
+      disabled ||
+      isRecording ||
+      isStarting ||
+      isTranscribing ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        reportError(new Error("Audio recording is not supported in this browser."));
+      }
+      return;
+    }
+
+    setIsStarting(true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+
+        const audio = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType || "audio/webm",
+        });
+        audioChunksRef.current = [];
+
+        if (audio.size === 0) return;
+
+        setIsTranscribing(true);
+        void transcribeAudio(audio)
+          .catch(reportError)
+          .finally(() => setIsTranscribing(false));
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+
+      if (!isControlled) setInternalRecording(true);
+      onRecordingChange?.(true);
+      onStart?.();
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setIsStarting(false);
+    }
+  }, [
+    disabled,
+    isControlled,
+    isRecording,
+    isStarting,
+    isTranscribing,
+    onRecordingChange,
+    onStart,
+    reportError,
+    transcribeAudio,
+  ]);
 
   const setRecording = useCallback(
     (nextRecording: boolean) => {
-      if ((disabled && nextRecording) || nextRecording === isRecording) return;
+      if (nextRecording) {
+        void startRecording();
+        return;
+      }
 
-      if (!isControlled) setInternalRecording(nextRecording);
-      onRecordingChange?.(nextRecording);
+      if (!isRecording) return;
 
-      if (nextRecording) onStart?.();
-      else onStop?.(elapsedSecondsRef.current);
+      if (!isControlled) setInternalRecording(false);
+      onRecordingChange?.(false);
+      onStop?.(elapsedSecondsRef.current);
+
+      const mediaRecorder = mediaRecorderRef.current;
+      if (mediaRecorder?.state !== "inactive") mediaRecorder?.stop();
     },
-    [disabled, isControlled, isRecording, onRecordingChange, onStart, onStop]
+    [isControlled, isRecording, onRecordingChange, onStop, startRecording]
   );
+
+  useEffect(() => {
+    return () => {
+      const mediaRecorder = mediaRecorderRef.current;
+      if (mediaRecorder?.state !== "inactive") mediaRecorder?.stop();
+      mediaRecorder?.stream.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   useEffect(() => {
     if (!isRecording) {
@@ -136,7 +255,7 @@ export function VoiceInputButton({
       className={cn(
         styles.voiceControl,
         isRecording && styles.recording,
-        disabled && !isRecording && styles.disabled,
+        (disabled || isStarting || isTranscribing) && !isRecording && styles.disabled,
         className
       )}
       data-recording={isRecording}
@@ -144,7 +263,7 @@ export function VoiceInputButton({
       <button
         className={styles.voiceTrigger}
         type="button"
-        disabled={disabled && !isRecording}
+        disabled={(disabled || isStarting || isTranscribing) && !isRecording}
         aria-label={isRecording ? activeLabel : startLabel}
         aria-pressed={isRecording}
         title={isRecording ? activeLabel : startLabel}

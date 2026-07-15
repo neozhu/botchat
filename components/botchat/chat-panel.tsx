@@ -1131,7 +1131,12 @@ export function ChatPanel({
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <ToolbarIcon icon={MessageCircle} label="Message type" />
-                    <VoiceInputButton disabled={!canSend} />
+                    <VoiceInputButton
+                      disabled={!canSend}
+                      onTranscription={(text) =>
+                        setInput(input + (input ? " " : "") + text)
+                      }
+                    />
                     <ToolbarIcon
                       icon={Brain}
                       label={isHighReasoning ? "Reasoning: High" : "Reasoning: Low"}

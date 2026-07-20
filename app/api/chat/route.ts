@@ -28,7 +28,7 @@ import {
   loadChatSkillsForPrompt,
 } from "@/lib/botchat/skills";
 
-export const maxDuration = 30;
+export const maxDuration = 120;
 
 type SupabaseServerClient = Awaited<
   ReturnType<typeof createSupabaseServerClient>

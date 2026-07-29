@@ -4,17 +4,12 @@ import assert from "node:assert/strict";
 import {
   SESSION_TITLE_MAX_CJK_CHARACTERS,
   SESSION_TITLE_MAX_ENGLISH_WORDS,
-  SESSION_TITLE_MODEL_ID,
   buildSessionTitlePrompt,
   getOptimisticSessionTitle,
   isSessionTitleTooLong,
   normalizeGeneratedSessionTitle,
   shouldGenerateSessionTitle,
 } from "./session-title.ts";
-
-test("session title model is the fast mini model", () => {
-  assert.equal(SESSION_TITLE_MODEL_ID, "gpt-5.4-mini");
-});
 
 test("session title over-limit detection uses twelve English words", () => {
   assert.equal(

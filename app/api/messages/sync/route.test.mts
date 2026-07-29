@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-test("message sync summarizes every first user title with the fast mini model", () => {
+test("message sync summarizes every first user title with the configured summary model", () => {
   const routeSource = readFileSync(
     fileURLToPath(new URL("./route.ts", import.meta.url)),
     "utf8"
@@ -17,7 +17,11 @@ test("message sync summarizes every first user title with the fast mini model", 
     routeSource,
     /const\s+lastText\s*=\s*last\s*\?\s*messageText\(last\)/
   );
-  assert.match(routeSource, /model:\s*openai\(SESSION_TITLE_MODEL_ID\)/);
+  assert.match(
+    routeSource,
+    /import\s+\{\s*getConversationSummaryModelId\s*\}\s+from\s+"@\/lib\/ai\/openai"/
+  );
+  assert.match(routeSource, /model:\s*openai\(getConversationSummaryModelId\(\)\)/);
   assert.match(routeSource, /reasoningEffort:\s*"none"/);
   assert.match(routeSource, /session:\s*{\s*id:\s*sessionId,\s*\.\.\.update\s*}/);
 });

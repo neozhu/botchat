@@ -1,4 +1,3 @@
-export const SESSION_TITLE_MODEL_ID = "gpt-5.4-mini";
 export const SESSION_TITLE_MAX_ENGLISH_WORDS = 12;
 export const SESSION_TITLE_MAX_CJK_CHARACTERS = 12;
 

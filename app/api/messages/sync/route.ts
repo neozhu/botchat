@@ -1,9 +1,9 @@
 import { generateText, type UIMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { getConversationSummaryModelId } from "@/lib/ai/openai";
 import { persistRollingConversationSummary } from "@/lib/botchat/rolling-summary";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
-  SESSION_TITLE_MODEL_ID,
   buildSessionTitlePrompt,
   normalizeGeneratedSessionTitle,
   shouldGenerateSessionTitle,
@@ -59,7 +59,7 @@ function messageTotalTokens(message: UIMessage) {
 async function buildSessionTitle(titleSource: string) {
   try {
     const { text } = await generateText({
-      model: openai(SESSION_TITLE_MODEL_ID),
+      model: openai(getConversationSummaryModelId()),
       providerOptions: {
         openai: {
           reasoningEffort: "none",

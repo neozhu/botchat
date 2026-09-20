@@ -298,7 +298,7 @@ export function SessionsPanel({
                       isActive={item.id === activeSessionId}
                       tooltip={item.title}
                       className={cn(
-                        "min-h-[58px] justify-start rounded-[20px] px-3 py-2.5 pr-10",
+                        "min-h-[58px] justify-start rounded-[20px] px-3 py-2.5",
                         "group-data-[collapsible=icon]:min-h-[46px] group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center",
                         item.id === activeSessionId
                           ? "bg-white shadow-[0_18px_40px_-28px_rgba(32,24,70,0.6)]"
@@ -340,10 +340,9 @@ export function SessionsPanel({
                       aria-label="Delete session"
                       disabled={isDeleting}
                       className={cn(
-                        "absolute right-2.5 top-2.5 h-6 w-6 rounded-full text-muted-foreground opacity-0 transition",
-                        "hover:bg-red-500/10 hover:text-red-600",
-                        item.id === activeSessionId && "opacity-100",
-                        "group-hover/session-item:opacity-100"
+                        "absolute right-2.5 top-1/2 z-10 h-6 w-6 -translate-y-1/2 rounded-full bg-red-50 text-red-600 opacity-0 shadow-sm ring-1 ring-red-200 transition",
+                        "hover:bg-red-100 hover:text-red-700",
+                        "group-hover/session-item:opacity-100 group-focus-within/session-item:opacity-100"
                       )}
                       onClick={(event) => {
                         event.preventDefault();

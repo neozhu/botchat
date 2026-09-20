@@ -10,7 +10,11 @@ import {
 } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
-import { normalizeReasoningEffort } from "@/lib/ai/reasoning-effort";
+import {
+  normalizeExpertReasoningEffort,
+  resolveReasoningEffort,
+  type ExpertReasoningEffort,
+} from "@/lib/ai/reasoning-effort";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   getConversationSummaryModelId,
@@ -38,17 +42,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function systemPromptFromJoinRow(value: unknown): string | undefined {
+function expertFromJoinRow(value: unknown): Record<string, unknown> | undefined {
   if (!isRecord(value)) return undefined;
   const expert = value.expert;
-  if (isRecord(expert) && typeof expert.system_prompt === "string") {
-    return expert.system_prompt;
-  }
+  if (isRecord(expert)) return expert;
   if (Array.isArray(expert)) {
     const first = expert[0];
-    if (isRecord(first) && typeof first.system_prompt === "string") {
-      return first.system_prompt;
-    }
+    if (isRecord(first)) return first;
   }
   return undefined;
 }
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
   const messages = await Promise.resolve(body.messages);
   const sessionId: string | undefined = body?.sessionId;
   const expertId: string | undefined = body?.expertId;
-  const reasoningEffort = normalizeReasoningEffort(body?.reasoningEffort);
+  const reasoningEffortOverride = body?.reasoningEffort;
   const isWebSearchEnabled = body?.webSearch === true;
 
   if (!Array.isArray(messages)) {
@@ -127,6 +127,8 @@ export async function POST(request: Request) {
 
   let system =
     "You are a premium luggage brand assistant. Be concise, confident, and proactive with tasteful product suggestions.";
+  let expertModel: string | null = null;
+  let expertReasoningEffort: ExpertReasoningEffort = "medium";
   let contextSummary: string | null = null;
   let summarizedUiMessageIds = new Set<string>();
   let supabase: SupabaseServerClient | null = null;
@@ -137,7 +139,9 @@ export async function POST(request: Request) {
       const [sessionResult, summarizedMessagesResult] = await Promise.all([
         supabase
           .from("chat_sessions")
-          .select("expert:experts(system_prompt), context_summary")
+          .select(
+            "expert:experts(system_prompt, model, reasoning_effort), context_summary"
+          )
           .eq("id", sessionId)
           .maybeSingle(),
         supabase
@@ -147,8 +151,16 @@ export async function POST(request: Request) {
           .not("summarized_at", "is", null),
       ]);
 
-      const systemPrompt = systemPromptFromJoinRow(sessionResult.data);
-      if (systemPrompt) system = systemPrompt;
+      const expert = expertFromJoinRow(sessionResult.data);
+      if (expert && typeof expert.system_prompt === "string") {
+        system = expert.system_prompt;
+      }
+      if (expert && typeof expert.model === "string" && expert.model.trim()) {
+        expertModel = expert.model;
+      }
+      expertReasoningEffort = normalizeExpertReasoningEffort(
+        expert?.reasoning_effort
+      );
       if (
         isRecord(sessionResult.data) &&
         typeof sessionResult.data.context_summary === "string"
@@ -167,12 +179,18 @@ export async function POST(request: Request) {
     } else if (expertId) {
       const { data } = await supabase
         .from("experts")
-        .select("system_prompt")
+        .select("system_prompt, model, reasoning_effort")
         .eq("id", expertId)
         .maybeSingle();
       if (isRecord(data) && typeof data.system_prompt === "string") {
         system = data.system_prompt;
       }
+      if (isRecord(data) && typeof data.model === "string" && data.model.trim()) {
+        expertModel = data.model;
+      }
+      expertReasoningEffort = normalizeExpertReasoningEffort(
+        isRecord(data) ? data.reasoning_effort : undefined
+      );
     }
   } catch {
     // Fallback to default system prompt if Supabase is unavailable.
@@ -249,8 +267,12 @@ export async function POST(request: Request) {
   }
 
   const modelMessages = await convertToModelMessages(preparedContext.messages);
+  const reasoningEffort = resolveReasoningEffort(
+    expertReasoningEffort,
+    reasoningEffortOverride
+  );
   const result = streamText({
-    model: openai(getOpenAIModelId()),
+    model: openai(getOpenAIModelId(expertModel)),
     providerOptions: {
       openai: {
         reasoningEffort,

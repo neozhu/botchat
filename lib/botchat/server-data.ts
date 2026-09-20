@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { expertSeeds } from "@/lib/botchat/expert-seeds";
 import { shouldSeedExperts } from "@/lib/botchat/expert-seeding";
 import { buildSessionInsertPayload } from "@/lib/botchat/session-payload";
+import type { ExpertReasoningEffort } from "@/lib/ai/reasoning-effort";
 import type { ExpertRow, SessionRow } from "@/lib/botchat/types";
 
 export const BOTCHAT_EXPERTS_TAG = "botchat-experts";
@@ -36,6 +37,8 @@ export type SaveExpertInput = {
   description: string | null;
   system_prompt: string;
   suggestion_question: string | null;
+  model: string | null;
+  reasoning_effort: ExpertReasoningEffort;
   sort_order: number;
 };
 
@@ -67,7 +70,7 @@ export async function loadExpertsFresh() {
   const { data, error } = await supabase
     .from("experts")
     .select(
-      "id, slug, name, agent_name, description, system_prompt, suggestion_question, sort_order, created_at"
+      "id, slug, name, agent_name, description, system_prompt, suggestion_question, model, reasoning_effort, sort_order, created_at"
     )
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -183,6 +186,8 @@ export async function saveExpert(input: SaveExpertInput) {
     description: input.description,
     system_prompt: input.system_prompt,
     suggestion_question: input.suggestion_question,
+    model: input.model,
+    reasoning_effort: input.reasoning_effort,
     sort_order: input.sort_order,
   };
 

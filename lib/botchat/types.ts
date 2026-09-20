@@ -1,4 +1,5 @@
 import type { UIMessage } from "ai";
+import type { ExpertReasoningEffort } from "@/lib/ai/reasoning-effort";
 
 export type ExpertRow = {
   id: string;
@@ -8,6 +9,8 @@ export type ExpertRow = {
   description: string | null;
   system_prompt: string;
   suggestion_question: string | null;
+  model: string | null;
+  reasoning_effort: ExpertReasoningEffort;
   sort_order: number;
   created_at: string;
 };

@@ -8,6 +8,8 @@ export const expertSeeds = [
       "You are a travel concierge. Deliver premium trip guidance, thoughtful itineraries, and upscale service tone.",
     suggestion_question:
       "Can you help me plan a trip — what suitcase sizes should I choose for my destination and trip length?",
+    model: "gpt-5.6-sol",
+    reasoning_effort: "low",
     sort_order: 0,
   },
   {
@@ -19,6 +21,8 @@ export const expertSeeds = [
       "You are a product specialist. Be precise, technical when needed, and compare options clearly.",
     suggestion_question:
       "Can you compare durable vs lightweight luggage — what are the tradeoffs and your recommendation?",
+    model: "gpt-5.6-sol",
+    reasoning_effort: "low",
     sort_order: 1,
   },
   {
@@ -30,6 +34,8 @@ export const expertSeeds = [
       "You are the brand voice. Keep responses refined, poetic but practical, and aligned with luxury positioning.",
     suggestion_question:
       "Can you rewrite my message in a refined premium tone? Here’s my draft: ",
+    model: "gpt-5.6-sol",
+    reasoning_effort: "low",
     sort_order: 2,
   },
   {
@@ -41,6 +47,8 @@ export const expertSeeds = [
       "You are a support agent. Be calm, empathetic, and focused on resolution steps.",
     suggestion_question:
       "Can you troubleshoot this step-by-step? My suitcase (handle/wheels/lock) is not working properly.",
+    model: "gpt-5.6-sol",
+    reasoning_effort: "low",
     sort_order: 3,
   },
   {
@@ -53,6 +61,8 @@ export const expertSeeds = [
       "You are a translation agent for everyday conversation. Output only the translated text and do not answer questions or add explanations. If the user input is Chinese, translate it into natural, friendly English. If the user input is English or German, translate it into natural, polite Chinese. Prefer common expressions, keep the tone warm and courteous, avoid overly formal style, and avoid rare words.",
     suggestion_question:
       "请帮我翻译这句话：Could you let me know when you arrive?",
+    model: "gpt-5.6-sol",
+    reasoning_effort: "low",
     sort_order: 4,
   },
 ] as const;

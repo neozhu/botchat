@@ -41,6 +41,7 @@ import {
   getExpertListDropResult,
 } from "@/lib/botchat/expert-list-sortable";
 import type { ExpertRow } from "@/lib/botchat/types";
+import type { ExpertReasoningEffort } from "@/lib/ai/reasoning-effort";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -54,6 +55,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -76,6 +84,8 @@ type ExpertDraft = {
   description: string;
   system_prompt: string;
   suggestion_question: string;
+  model: string;
+  reasoning_effort: ExpertReasoningEffort;
   sort_order: number;
 };
 
@@ -120,6 +130,8 @@ function defaultDraft(): ExpertDraft {
     description: "",
     system_prompt: "",
     suggestion_question: "",
+    model: "",
+    reasoning_effort: "medium",
     sort_order: 0,
   };
 }
@@ -345,6 +357,8 @@ export function ExpertSettingsDialog({
         draft.description.trim() !== "" ||
         draft.system_prompt.trim() !== "" ||
         draft.suggestion_question.trim() !== "" ||
+        draft.model.trim() !== "" ||
+        draft.reasoning_effort !== "medium" ||
         draft.sort_order !== 0
       );
     }
@@ -356,6 +370,8 @@ export function ExpertSettingsDialog({
       draft.description !== (selected.description ?? "") ||
       draft.system_prompt !== selected.system_prompt ||
       draft.suggestion_question !== (selected.suggestion_question ?? "") ||
+      draft.model !== (selected.model ?? "") ||
+      draft.reasoning_effort !== selected.reasoning_effort ||
       draft.sort_order !== selected.sort_order
     );
   }, [draft, selected]);
@@ -519,6 +535,8 @@ export function ExpertSettingsDialog({
       description: selected.description ?? "",
       system_prompt: selected.system_prompt,
       suggestion_question: selected.suggestion_question ?? "",
+      model: selected.model ?? "",
+      reasoning_effort: selected.reasoning_effort,
       sort_order: selected.sort_order,
     });
   }, [open, selected]);
@@ -569,6 +587,8 @@ export function ExpertSettingsDialog({
         description: draft.description.trim() || null,
         system_prompt: draft.system_prompt.trim(),
         suggestion_question: draft.suggestion_question.trim() || null,
+        model: draft.model.trim() || null,
+        reasoning_effort: draft.reasoning_effort,
         sort_order: nextSortOrder,
       };
 
@@ -649,6 +669,8 @@ export function ExpertSettingsDialog({
       description: selected.description ?? "",
       system_prompt: selected.system_prompt,
       suggestion_question: selected.suggestion_question ?? "",
+      model: selected.model ?? "",
+      reasoning_effort: selected.reasoning_effort,
       sort_order: selected.sort_order + 1,
     });
   };
@@ -929,7 +951,7 @@ export function ExpertSettingsDialog({
                     {headerLabel}
                   </p>
                   <p className="mt-1 text-sm text-foreground/70">
-                    System prompt controls behavior. Suggestion question is the starter chip.
+                    Configure behavior, model, reasoning, and the starter question.
                   </p>
                 </div>
 
@@ -1015,6 +1037,62 @@ export function ExpertSettingsDialog({
                       placeholder="What does this expert do? What tone?"
                       className="min-h-[84px] bg-white text-sm"
                     />
+                  </div>
+                </Card>
+
+                <Card className="gap-3 rounded-3xl border-black/10 bg-white/70 p-3.5 shadow-none">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="expert-model"
+                        className="text-[11px] font-medium text-muted-foreground"
+                      >
+                        Model
+                      </label>
+                      <Input
+                        id="expert-model"
+                        value={draft.model}
+                        onChange={(event) =>
+                          setDraft((prev) => ({ ...prev, model: event.target.value }))
+                        }
+                        placeholder="Uses OPENAI_MODEL when empty"
+                        className="bg-white"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Enter an OpenAI model ID, or leave empty to use the server default.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="expert-reasoning-effort"
+                        className="text-[11px] font-medium text-muted-foreground"
+                      >
+                        Reasoning effort
+                      </label>
+                      <Select
+                        value={draft.reasoning_effort}
+                        onValueChange={(value: ExpertReasoningEffort) =>
+                          setDraft((prev) => ({ ...prev, reasoning_effort: value }))
+                        }
+                      >
+                        <SelectTrigger
+                          id="expert-reasoning-effort"
+                          className="w-full bg-white"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low — Fast, concise reasoning</SelectItem>
+                          <SelectItem value="medium">Medium — Balanced (default)</SelectItem>
+                          <SelectItem value="high">High — Thorough reasoning</SelectItem>
+                          <SelectItem value="xhigh">Xhigh — Maximum reasoning</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        Chat users can temporarily switch between low and high.
+                      </p>
+                    </div>
                   </div>
                 </Card>
 

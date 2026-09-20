@@ -1,5 +1,5 @@
-export function getOpenAIModelId() {
-  const model = process.env.OPENAI_MODEL?.trim();
+export function getOpenAIModelId(expertModel?: string | null) {
+  const model = expertModel?.trim() || process.env.OPENAI_MODEL?.trim();
   if (!model) {
     throw new Error("Missing required environment variable: OPENAI_MODEL");
   }

@@ -15,6 +15,8 @@ function createExpert(overrides: Partial<ExpertRow>): ExpertRow {
     description: null,
     system_prompt: "Help plan travel.",
     suggestion_question: null,
+    model: null,
+    reasoning_effort: "medium",
     sort_order: 0,
     created_at: "2026-03-12T00:00:00.000Z",
     ...overrides,

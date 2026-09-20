@@ -5,6 +5,7 @@ import {
   loadExpertsFresh,
   saveExpert,
 } from "@/lib/botchat/server-data";
+import { normalizeExpertReasoningEffort } from "@/lib/ai/reasoning-effort";
 import { getDuplicateExpertNameError } from "@/lib/botchat/expert-settings";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -65,6 +66,11 @@ export async function POST(request: Request) {
         body.suggestion_question.trim()
           ? body.suggestion_question.trim()
           : null,
+      model:
+        typeof body.model === "string" && body.model.trim()
+          ? body.model.trim()
+          : null,
+      reasoning_effort: normalizeExpertReasoningEffort(body.reasoning_effort),
       sort_order:
         typeof body.sort_order === "number" && Number.isFinite(body.sort_order)
           ? body.sort_order

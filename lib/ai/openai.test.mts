@@ -61,3 +61,19 @@ test("getConversationSummaryModelId falls back to the chat model", () => {
     }
   }
 });
+
+test("getOpenAIModelId prefers a non-empty expert model", () => {
+  const original = process.env.OPENAI_MODEL;
+  process.env.OPENAI_MODEL = "fallback-model";
+
+  try {
+    assert.equal(getOpenAIModelId(" expert-model "), "expert-model");
+    assert.equal(getOpenAIModelId("  "), "fallback-model");
+  } finally {
+    if (original === undefined) {
+      delete process.env.OPENAI_MODEL;
+    } else {
+      process.env.OPENAI_MODEL = original;
+    }
+  }
+});

@@ -36,7 +36,7 @@ test("chat route uses persisted session summary state before runtime compaction"
   );
   assert.match(
     routeSource,
-    /\.select\("expert:experts\(system_prompt\), context_summary"\)/
+    /"expert:experts\(system_prompt, model, reasoning_effort\), context_summary"/
   );
   assert.match(
     routeSource,

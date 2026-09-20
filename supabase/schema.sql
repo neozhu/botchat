@@ -15,6 +15,9 @@ create table if not exists public.experts (
   description text,
   system_prompt text not null,
   suggestion_question text,
+  model text,
+  reasoning_effort text not null default 'medium'
+    check (reasoning_effort in ('low', 'medium', 'high', 'xhigh')),
   sort_order integer not null default 0
 );
 

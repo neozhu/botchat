@@ -7,7 +7,10 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { ChatPanel } from "@/components/botchat/chat-panel";
 import { SessionsPanel } from "@/components/botchat/sessions-panel";
-import { getReasoningEffortFromToggle } from "@/lib/ai/reasoning-effort";
+import {
+  isHighReasoningEffort,
+  type ReasoningEffort,
+} from "@/lib/ai/reasoning-effort";
 import { getOptimisticSessionTitle } from "@/lib/botchat/session-title";
 import type {
   BotchatBootstrapData,
@@ -148,7 +151,8 @@ export default function BotchatDashboard({
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [isLoadingSessionMessages, setIsLoadingSessionMessages] =
     useState(false);
-  const [isHighReasoning, setIsHighReasoning] = useState(false);
+  const [reasoningEffortOverride, setReasoningEffortOverride] =
+    useState<ReasoningEffort | null>(null);
   const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false);
   const [messageTimestamps, setMessageTimestamps] = useState<
     Record<string, string>
@@ -204,6 +208,9 @@ export default function BotchatDashboard({
     () => experts.find((expert) => expert.id === activeExpertId) ?? null,
     [experts, activeExpertId]
   );
+  const isHighReasoning = reasoningEffortOverride
+    ? reasoningEffortOverride === "high"
+    : isHighReasoningEffort(activeExpert?.reasoning_effort);
 
   const botName = activeExpert?.agent_name ?? "Kate";
   const botInitials = initialsFromName(botName);
@@ -339,6 +346,7 @@ export default function BotchatDashboard({
     setInput("");
 
     setActiveSessionId(session.id);
+    setReasoningEffortOverride(null);
     setActiveExpertId(session.expert_id);
 
     if (cachedSessionMessages) {
@@ -440,6 +448,7 @@ export default function BotchatDashboard({
       // Best-effort abort; creating a new session should still work.
     }
 
+    setReasoningEffortOverride(null);
     setActiveExpertId(expertId);
 
     const response = await fetch("/api/sessions", {
@@ -514,6 +523,7 @@ export default function BotchatDashboard({
 
     if (!isActiveSessionDeleted) {
       if (!activeSessionId && activeExpertId === expertId) {
+        setReasoningEffortOverride(null);
         setActiveExpertId(nextExperts[0]?.id ?? null);
       }
       return;
@@ -524,6 +534,7 @@ export default function BotchatDashboard({
     if (!nextSession) {
       setActiveSessionId(null);
       setIsLoadingSessionMessages(false);
+      setReasoningEffortOverride(null);
       setActiveExpertId(nextExperts[0]?.id ?? null);
       setCurrentMessagesSessionId(null);
       savedMessageIdsRef.current = new Set();
@@ -576,6 +587,7 @@ export default function BotchatDashboard({
           messageTimestamps: {},
         });
         setActiveSessionId(session.id);
+        setReasoningEffortOverride(null);
         setActiveExpertId(session.expert_id);
         setCurrentMessagesSessionId(session.id);
         savedMessageIdsRef.current = new Set();
@@ -796,7 +808,7 @@ export default function BotchatDashboard({
 
     const sessionIdAtSend = activeSessionId;
     const expertIdAtSend = activeExpertId;
-    const reasoningEffortAtSend = getReasoningEffortFromToggle(isHighReasoning);
+    const reasoningEffortAtSend = reasoningEffortOverride ?? undefined;
     const webSearchAtSend = isWebSearchEnabled;
     const abort = new AbortController();
 
@@ -920,7 +932,9 @@ export default function BotchatDashboard({
         setInput={setInput}
         isHighReasoning={isHighReasoning}
         isWebSearchEnabled={isWebSearchEnabled}
-        onToggleReasoning={() => setIsHighReasoning((value) => !value)}
+        onToggleReasoning={() =>
+          setReasoningEffortOverride(isHighReasoning ? "low" : "high")
+        }
         onToggleWebSearch={() => setIsWebSearchEnabled((value) => !value)}
         onSubmit={onSubmit}
         onCreateSessionForExpert={handleCreateSessionForExpert}

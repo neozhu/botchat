@@ -35,6 +35,11 @@ export async function POST(request: Request) {
 
   const { output } = await generateText({
     model: openai(getOpenAIModelId()),
+    providerOptions: {
+      openai: {
+        reasoningEffort: "medium",
+      },
+    },
     prompt,
     output: Output.object({
       schema: z.object({

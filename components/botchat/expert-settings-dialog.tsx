@@ -1083,10 +1083,12 @@ export function ExpertSettingsDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="low">Low — Fast, concise reasoning</SelectItem>
-                          <SelectItem value="medium">Medium — Balanced (default)</SelectItem>
-                          <SelectItem value="high">High — Thorough reasoning</SelectItem>
-                          <SelectItem value="xhigh">Xhigh — Maximum reasoning</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="xhigh">Xhigh</SelectItem>
+                          <SelectItem value="max">Max</SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-[11px] text-muted-foreground">

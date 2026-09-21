@@ -1,5 +1,5 @@
 export type ReasoningEffort = "low" | "high";
-export type ExpertReasoningEffort = "low" | "medium" | "high" | "xhigh";
+export type ExpertReasoningEffort = "none" |"low" | "medium" | "high" | "xhigh" | "max";
 
 export function normalizeReasoningEffort(value: unknown): ReasoningEffort {
   return value === "high" ? "high" : "low";
@@ -14,10 +14,11 @@ export function getReasoningEffortFromToggle(
 export function normalizeExpertReasoningEffort(
   value: unknown
 ): ExpertReasoningEffort {
-  return value === "low" ||
+  return value === "none" || value === "low" ||
     value === "medium" ||
     value === "high" ||
-    value === "xhigh"
+    value === "xhigh" ||
+    value ==="max"
     ? value
     : "medium";
 }
@@ -33,5 +34,5 @@ export function resolveReasoningEffort(
 }
 
 export function isHighReasoningEffort(value: unknown) {
-  return value === "high" || value === "xhigh";
+  return value === "high" || value === "xhigh" || value === "max";
 }

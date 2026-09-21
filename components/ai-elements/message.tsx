@@ -1,5 +1,6 @@
 "use client";
 
+import { math } from "@streamdown/math";
 import { Button } from "@/components/ui/button";
 import { CodeBlock, CodeBlockCopyButton } from "@/components/ai-elements/code-block";
 import {
@@ -393,8 +394,28 @@ const MarkdownCode = ({
 
 const MarkdownPre = ({ children }: ComponentProps<"pre">) => children;
 
+const latexDelimiterPattern =
+  /(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|`+[^`\n]*`+)|\\\(|\\\)|\\\[|\\\]/g;
+
+const normalizeLatexDelimiters = (markdown: string) =>
+  markdown.replace(latexDelimiterPattern, (match, protectedMarkdown) => {
+    if (protectedMarkdown) {
+      return match;
+    }
+
+    if (match === "\\[") {
+      return "$$\n";
+    }
+
+    if (match === "\\]") {
+      return "\n$$";
+    }
+
+    return "$$";
+  });
+
 export const MessageResponse = memo(
-  ({ className, components, ...props }: MessageResponseProps) => (
+  ({ className, components, plugins, children, ...props }: MessageResponseProps) => (
     <Streamdown
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
@@ -421,7 +442,9 @@ export const MessageResponse = memo(
         code: MarkdownCode,
         pre: MarkdownPre,
         ...components,
-      }}
+      } as NonNullable<MessageResponseProps["components"]>}
+      plugins={{ ...plugins, math }}
+      children={normalizeLatexDelimiters(children ?? "")}
       {...props}
     />
   ),

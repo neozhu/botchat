@@ -60,7 +60,6 @@ import {
   Paperclip,
   Send,
   Volume2,
-  Wand2,
   X,
 } from "lucide-react";
 
@@ -71,7 +70,6 @@ type ExpertItem = {
   description?: string | null;
   system_prompt?: string;
 };
-
 type DatedMessage = UIMessage & {
   createdAt?: string | null;
 };
@@ -161,8 +159,8 @@ function ToolbarIcon({
           variant="ghost"
           disabled={disabled}
           className={cn(
-            "h-8 w-8 rounded-full",
-            highlight && "bg-[var(--accent-line)]/15 text-[var(--accent-line)]"
+            "size-8 rounded-full",
+            highlight && "bg-[var(--accent-line)] text-white hover:bg-[var(--accent-line)]/90 hover:text-white"
           )}
           onClick={onClick}
         >
@@ -1159,7 +1157,7 @@ export function ChatPanel({
                       disabled={!canSend}
                       onClick={() => fileInputRef.current?.click()}
                     />
-                    <ToolbarIcon icon={Wand2} label="AI assist" highlight />
+                   
                   </div>
                   <Button
                     type="submit"

@@ -159,7 +159,7 @@ function ToolbarIcon({
           variant="ghost"
           disabled={disabled}
           className={cn(
-            "size-8 rounded-full",
+            "size-6 rounded-full",
             highlight && "bg-[var(--accent-line)] text-white hover:bg-[var(--accent-line)]/90 hover:text-white"
           )}
           onClick={onClick}

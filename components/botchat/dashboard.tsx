@@ -673,6 +673,7 @@ export default function BotchatDashboard({
     const sessionId = renderedMessagesSessionId;
     if (!sessionId) return;
     if (messages.length === 0) return;
+    const summarize = status === "ready";
 
     const savedIds = savedMessageIdsRef.current;
     const savedMessageFingerprints = savedMessageFingerprintsRef.current;
@@ -697,11 +698,6 @@ export default function BotchatDashboard({
 
     if (toUpsert.length === 0) return;
 
-    toUpsert.forEach((m) => {
-      savedIds.add(m.id);
-      savedMessageFingerprints.set(m.id, messageFingerprint(m));
-    });
-
     const timeout = setTimeout(() => {
       void (async () => {
         try {
@@ -710,6 +706,7 @@ export default function BotchatDashboard({
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               sessionId,
+              summarize,
               messages: toUpsert.map((message) => ({
                 ...message,
                 position: messages.findIndex((m) => m.id === message.id),
@@ -724,6 +721,16 @@ export default function BotchatDashboard({
             );
             return;
           }
+
+          toUpsert.forEach((m) => {
+            savedIds.add(m.id);
+            if (m.role === "assistant" && !summarize) {
+              // Force a final sync even if the finish event adds no new parts.
+              savedMessageFingerprints.delete(m.id);
+            } else {
+              savedMessageFingerprints.set(m.id, messageFingerprint(m));
+            }
+          });
 
           const syncPayload = (await response.json()) as {
             session?: SyncedSessionUpdate;
@@ -767,7 +774,7 @@ export default function BotchatDashboard({
     return () => {
       clearTimeout(timeout);
     };
-  }, [messages, renderedMessagesSessionId]);
+  }, [messages, renderedMessagesSessionId, status]);
 
   const uploadAttachments = async (
     sessionId: string,

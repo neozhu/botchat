@@ -368,7 +368,7 @@ test("relevant context preserves selected raw messages without exposing a saved 
     textMessage("u3", "user", "Continue that solution"),
   ], options);
 
-  assert.deepEqual(context.messages.map((message) => message.id), ["a1", "u2", "u3"]);
+  assert.deepEqual(context.messages.map((message) => message.id), ["u1", "a1", "u2", "a2", "u3"]);
   assert.equal(context.systemContext, undefined);
   assert.equal(Object.hasOwn(evaluatedState ?? {}, "summary"), false);
 });
@@ -391,11 +391,11 @@ test("relevant context evaluates six historical messages across three turns excl
     },
   });
 
-  assert.deepEqual(evaluatedState?.recentMessages.map((message) => message.id), ["u3", "a3", "u4", "a4", "u5", "a5"]);
-  assert.equal(evaluatedState?.recentMessages[0]?.role, "user");
-  assert.match(evaluatedState?.recentMessages[0]?.text ?? "", /third question/);
-  assert.equal(evaluatedState?.recentMessages[1]?.role, "assistant");
-  assert.match(evaluatedState?.recentMessages[5]?.text ?? "", /fifth answer/);
+  assert.deepEqual(evaluatedState?.recentTurns.map((turn) => turn.messages.map((message) => message.id)), [["u3", "a3"], ["u4", "a4"], ["u5", "a5"]]);
+  assert.equal(evaluatedState?.recentTurns[0]?.messages[0]?.role, "user");
+  assert.match(evaluatedState?.recentTurns[0]?.messages[0]?.text ?? "", /third question/);
+  assert.equal(evaluatedState?.recentTurns[0]?.messages[1]?.role, "assistant");
+  assert.match(evaluatedState?.recentTurns[2]?.messages[1]?.text ?? "", /fifth answer/);
   assert.match(evaluatedState?.currentMessage ?? "", /current question/);
 }));
 
@@ -445,7 +445,7 @@ test("relevant context preserves assistant tool continuation in the current turn
   assert.deepEqual(context.messages, messages);
 });
 
-test("relevant context sends only selected individual messages from four turns in chronological order", () => withoutChatContextEnv(async () => {
+test("relevant context includes selected complete turns in chronological order without duplicates", () => withoutChatContextEnv(async () => {
   process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "8";
   const messages = [
     textMessage("u1", "user", "First question"), textMessage("a1", "assistant", "First answer"),
@@ -455,10 +455,10 @@ test("relevant context sends only selected individual messages from four turns i
     textMessage("u5", "user", "Current question"),
   ];
   const context = await chatContext.prepareRelevantChatModelContext(messages, {
-    evaluateHistoryNeed: async () => ({ messageIds: ["a3", "u2"] }),
+    evaluateHistoryNeed: async () => ({ messageIds: ["a3", "u2", "a2"] }),
   });
 
-  assert.deepEqual(context.messages.map((message) => message.id), ["u2", "a3", "u5"]);
+  assert.deepEqual(context.messages.map((message) => message.id), ["u2", "a2", "u3", "a3", "u5"]);
   assert.equal(context.systemContext, undefined);
 }));
 
@@ -473,16 +473,16 @@ test("relevant context reads the candidate window from BOTCHAT_COMPACT_AFTER_USE
   let candidateIds: string[] = [];
   const context = await chatContext.prepareRelevantChatModelContext(messages, {
     evaluateHistoryNeed: async (state) => {
-      candidateIds = state.recentMessages.map((message) => message.id);
+      candidateIds = state.recentTurns.flatMap((turn) => turn.messages.map((message) => message.id));
       return { messageIds: ["a3"] };
     },
   });
 
   assert.deepEqual(candidateIds, ["u3", "a3"]);
-  assert.deepEqual(context.messages.map((message) => message.id), ["a3", "u4"]);
+  assert.deepEqual(context.messages.map((message) => message.id), ["u3", "a3", "u4"]);
 }));
 
-test("relevant context uses an odd message limit without expanding to complete turns", () => withoutChatContextEnv(async () => {
+test("relevant context expands an odd message limit to include the complete boundary turn", () => withoutChatContextEnv(async () => {
   process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "3";
   const messages = [
     textMessage("u1", "user", "Old question"), textMessage("a1", "assistant", "Old answer"),
@@ -493,11 +493,35 @@ test("relevant context uses an odd message limit without expanding to complete t
   let candidateIds: string[] = [];
   const context = await chatContext.prepareRelevantChatModelContext(messages, {
     evaluateHistoryNeed: async (state) => {
-      candidateIds = state.recentMessages.map((message) => message.id);
+      candidateIds = state.recentTurns.flatMap((turn) => turn.messages.map((message) => message.id));
       return { messageIds: ["a2"] };
     },
   });
 
-  assert.deepEqual(candidateIds, ["a2", "u3", "a3"]);
-  assert.deepEqual(context.messages.map((message) => message.id), ["a2", "u4"]);
+  assert.deepEqual(candidateIds, ["u2", "a2", "u3", "a3"]);
+  assert.deepEqual(context.messages.map((message) => message.id), ["u2", "a2", "u4"]);
+}));
+
+test("relevant context groups multiple assistant replies and preserves their raw tool parts", () => withoutChatContextEnv(async () => {
+  process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "1";
+  const toolReply: UIMessage = {
+    id: "a1-tool", role: "assistant",
+    parts: [{ type: "tool-clock", toolCallId: "clock-1", state: "output-available", input: {}, output: { time: "12:00" } }],
+  };
+  const messages = [
+    textMessage("u1", "user", "What time is it?"),
+    toolReply,
+    textMessage("a1", "assistant", "It is 12:00."),
+    textMessage("u2", "user", "What was that time?"),
+  ];
+  let evaluatedState: chatContext.ChatHistoryRelevanceState | undefined;
+  const context = await chatContext.prepareRelevantChatModelContext(messages, {
+    evaluateHistoryNeed: async (state) => {
+      evaluatedState = state;
+      return { messageIds: ["a1"] };
+    },
+  });
+  assert.deepEqual(evaluatedState?.recentTurns.map((turn) => turn.messages.map((message) => message.id)), [["u1", "a1-tool", "a1"]]);
+  assert.deepEqual(context.messages, messages);
+  assert.equal(context.messages[1], toolReply);
 }));

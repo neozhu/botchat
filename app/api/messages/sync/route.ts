@@ -83,31 +83,43 @@ function rowToUiMessage(row: UnsummarizedMessageRow): UIMessage {
   };
 }
 
+const conversationSummaryQueues = new Map<string, Promise<void>>();
+
 async function persistConversationSummaryIfNeeded(
   supabase: SupabaseServerClient,
   sessionId: string
 ) {
-  const unsummarizedMessagesResult = await supabase
-    .from("chat_messages")
-    .select("id, ui_message_id, role, parts")
-    .eq("session_id", sessionId)
-    .is("summarized_at", null)
-    .order("position", { ascending: true });
-  if (unsummarizedMessagesResult.error) {
-    throw new Error(unsummarizedMessagesResult.error.message);
-  }
+  const previous = conversationSummaryQueues.get(sessionId) ?? Promise.resolve();
+  const task = previous.catch(() => {}).then(async () => {
+    // Re-read after the previous task has marked its batch as summarized.
+    const unsummarizedMessagesResult = await supabase
+      .from("chat_messages")
+      .select("id, ui_message_id, role, parts")
+      .eq("session_id", sessionId)
+      .is("summarized_at", null)
+      .order("position", { ascending: true });
+    if (unsummarizedMessagesResult.error) {
+      throw new Error(unsummarizedMessagesResult.error.message);
+    }
 
-  const unsummarizedRows = (unsummarizedMessagesResult.data ?? []).filter(
-    (row): row is UnsummarizedMessageRow =>
-      typeof row.id === "string" &&
-      typeof row.ui_message_id === "string" &&
-      (row.role === "user" || row.role === "assistant")
-  );
-  await persistConversationSummaryBatches({
-    supabase,
-    sessionId,
-    messages: unsummarizedRows,
-    toUiMessage: rowToUiMessage,
+    const unsummarizedRows = (unsummarizedMessagesResult.data ?? []).filter(
+      (row): row is UnsummarizedMessageRow =>
+        typeof row.id === "string" &&
+        typeof row.ui_message_id === "string" &&
+        (row.role === "user" || row.role === "assistant")
+    );
+    await persistConversationSummaryBatches({
+      supabase,
+      sessionId,
+      messages: unsummarizedRows,
+      toUiMessage: rowToUiMessage,
+    });
+  });
+  conversationSummaryQueues.set(sessionId, task);
+  return task.finally(() => {
+    if (conversationSummaryQueues.get(sessionId) === task) {
+      conversationSummaryQueues.delete(sessionId);
+    }
   });
 }
 
@@ -236,10 +248,12 @@ export async function POST(request: Request) {
     }
   }
 
-  try {
-    await persistConversationSummaryIfNeeded(supabase, sessionId);
-  } catch (error) {
-    console.error("Failed to persist conversation summary", error);
+  if (body?.summarize === true) {
+    try {
+      await persistConversationSummaryIfNeeded(supabase, sessionId);
+    } catch (error) {
+      console.error("Failed to persist conversation summary", error);
+    }
   }
 
   return new Response(

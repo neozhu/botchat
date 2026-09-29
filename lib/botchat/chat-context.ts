@@ -24,7 +24,9 @@ type PreparedChatModelContext = {
 
 export type ChatHistoryRelevanceState = {
   currentMessage: string;
-  recentMessages: { id: string; role: UIMessage["role"]; text: string }[];
+  recentTurns: {
+    messages: { id: string; role: UIMessage["role"]; text: string }[];
+  }[];
 };
 
 export type ChatHistorySelection = {
@@ -213,17 +215,27 @@ export async function prepareRelevantChatModelContext(
   }
 
   const historyMessageCount = getChatContextConfig().compactAfterUserMessageCount;
-  const recentStartIndex = Math.max(0, currentMessageIndex - historyMessageCount);
-  const recentMessages = messages.slice(recentStartIndex, currentMessageIndex);
+  const windowStartIndex = Math.max(0, currentMessageIndex - historyMessageCount);
+  // Include the entire turn if the message window begins inside a reply.
+  const recentStartIndex = previousTurnIndices.findLast(
+    (index) => index <= windowStartIndex
+  ) ?? previousTurnIndices[0];
+  const recentTurnIndices = previousTurnIndices.filter((index) => index >= recentStartIndex);
+  const recentTurns = recentTurnIndices.map((index, turnIndex) =>
+    messages.slice(index, recentTurnIndices[turnIndex + 1] ?? currentMessageIndex)
+  );
+  const recentMessages = recentTurns.flat();
   const candidateIds = new Set(recentMessages.map((message) => message.id));
   let selection: ChatHistorySelection;
   try {
     selection = await options.evaluateHistoryNeed({
       currentMessage: formatConversationTranscript(currentMessages),
-      recentMessages: recentMessages.map((message) => ({
-        id: message.id,
-        role: message.role,
-        text: messageText(message),
+      recentTurns: recentTurns.map((turn) => ({
+        messages: turn.map((message) => ({
+          id: message.id,
+          role: message.role,
+          text: messageText(message),
+        })),
       })),
     });
     if (
@@ -242,7 +254,9 @@ export async function prepareRelevantChatModelContext(
   const selectedIds = new Set(selection.messageIds);
   return {
     messages: [
-      ...recentMessages.filter((message) => selectedIds.has(message.id)),
+      ...recentTurns
+        .filter((turn) => turn.some((message) => selectedIds.has(message.id)))
+        .flat(),
       ...currentMessages,
     ],
     compacted: false,

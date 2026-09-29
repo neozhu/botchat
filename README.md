@@ -37,11 +37,19 @@ Required:
 - `OPENAI_API_KEY` – your OpenAI API key
 - `OPENAI_MODEL` – e.g. `gpt-5-mini` (model is not hardcoded in code)
 
-Optional chat context compaction:
+Optional saved conversation summaries:
 
 - `OPENAI_CONVERSATION_SUMMARY_MODEL` – model used for session title and context summary generation; falls back to `OPENAI_MODEL`
-- `BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS` – actual unsummarized chat token threshold before persisting a rolling session summary; defaults to `1000`
-- `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT` – user-message count threshold before runtime context compaction; defaults to `4`
+- `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT` – despite the retained variable name, counts all user and assistant messages. It controls both the number of messages per saved summary batch and the maximum number of historical messages considered for relevance selection, excluding the current turn; defaults to `6` (normally three user/assistant turns). Set it to `8` for four turns.
+
+After messages are saved, each full batch is summarized independently and marked as summarized. With a batch size of `6`, messages 1–6 form one summary and messages 7–12 form the next; incomplete batches wait for more messages. Each summary replaces the session's `context_summary` field without combining it with the previous summary. Summary generation uses only message count; the former `BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS` setting is ignored.
+
+Optional history relevance routing:
+
+- `TYPESAFE_API_KEY` – server-only TypeSafe key for Jev to evaluate each historical message within the configured conversation window against the current message
+- `TYPESAFE_MODEL` – Jev model for history relevance evaluation; defaults to `jev-latest`
+
+One Jev request batches an individual question for each historical message. Only messages with a Noul true probability of at least `0.9` are sent to the chat model, in chronological order; selecting one message does not include its entire turn or the other turns. Lower probabilities are treated as unrelated and discarded, without triggering fallback. Saved summaries are not sent to Jev or the chat model. If Jev fails, times out after 5 seconds, or its key is missing, the request includes only the previous conversation turn and the current message. Summary generation and message persistence continue regardless of this selection.
 
 Supabase (recommended for sessions/experts/attachments):
 
@@ -89,7 +97,7 @@ docker compose up -d --build
 
 App is exposed at `http://localhost:3202` (mapped from container `3000`).
 
-Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_CONVERSATION_SUMMARY_MODEL`, `BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS`, `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in your deployment platform or `docker-compose.yml`.
+Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_CONVERSATION_SUMMARY_MODEL`, `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT`, `TYPESAFE_API_KEY`, `TYPESAFE_MODEL`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in your deployment platform or `docker-compose.yml`.
 
 ## Project structure
 

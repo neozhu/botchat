@@ -1,7 +1,6 @@
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
-  generateText,
   isStepCount,
   streamText,
   toUIMessageStream,
@@ -16,27 +15,15 @@ import {
   type ExpertReasoningEffort,
 } from "@/lib/ai/reasoning-effort";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import {
-  getConversationSummaryModelId,
-  getOpenAIModelId,
-} from "@/lib/ai/openai";
-import {
-  appendSavedConversationSummaryContext,
-  buildConversationSummaryPrompt,
-  filterSummarizedMessages,
-  prepareChatModelContext,
-} from "@/lib/botchat/chat-context";
-import { persistRollingConversationSummary } from "@/lib/botchat/rolling-summary";
+import { getOpenAIModelId } from "@/lib/ai/openai";
+import { evaluateChatHistoryNeed } from "@/lib/ai/typesafe";
+import { prepareRelevantChatModelContext } from "@/lib/botchat/chat-context";
 import {
   appendChatSkillInstructions,
   loadChatSkillsForPrompt,
 } from "@/lib/botchat/skills";
 
 export const maxDuration = 120;
-
-type SupabaseServerClient = Awaited<
-  ReturnType<typeof createSupabaseServerClient>
->;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -129,27 +116,14 @@ export async function POST(request: Request) {
     "You are a premium luggage brand assistant. Be concise, confident, and proactive with tasteful product suggestions.";
   let expertModel: string | null = null;
   let expertReasoningEffort: ExpertReasoningEffort = "medium";
-  let contextSummary: string | null = null;
-  let summarizedUiMessageIds = new Set<string>();
-  let supabase: SupabaseServerClient | null = null;
-
   try {
-    supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     if (sessionId) {
-      const [sessionResult, summarizedMessagesResult] = await Promise.all([
-        supabase
-          .from("chat_sessions")
-          .select(
-            "expert:experts(system_prompt, model, reasoning_effort), context_summary"
-          )
-          .eq("id", sessionId)
-          .maybeSingle(),
-        supabase
-          .from("chat_messages")
-          .select("ui_message_id")
-          .eq("session_id", sessionId)
-          .not("summarized_at", "is", null),
-      ]);
+      const sessionResult = await supabase
+        .from("chat_sessions")
+        .select("expert:experts(system_prompt, model, reasoning_effort)")
+        .eq("id", sessionId)
+        .maybeSingle();
 
       const expert = expertFromJoinRow(sessionResult.data);
       if (expert && typeof expert.system_prompt === "string") {
@@ -160,21 +134,6 @@ export async function POST(request: Request) {
       }
       expertReasoningEffort = normalizeExpertReasoningEffort(
         expert?.reasoning_effort
-      );
-      if (
-        isRecord(sessionResult.data) &&
-        typeof sessionResult.data.context_summary === "string"
-      ) {
-        contextSummary = sessionResult.data.context_summary;
-      }
-      summarizedUiMessageIds = new Set(
-        (summarizedMessagesResult.data ?? [])
-          .map((row) =>
-            isRecord(row) && typeof row.ui_message_id === "string"
-              ? row.ui_message_id
-              : null
-          )
-          .filter((id): id is string => Boolean(id))
       );
     } else if (expertId) {
       const { data } = await supabase
@@ -210,61 +169,12 @@ export async function POST(request: Request) {
     system = `${system}\n\n${buildCurrentSystemDateTimeContext()}`;
   }
 
-  let contextMessages = filterSummarizedMessages(
+  const preparedContext = await prepareRelevantChatModelContext(
     messages as UIMessage[],
-    summarizedUiMessageIds
-  );
-
-  if (sessionId && supabase) {
-    try {
-      const persistedSummary =
-        await persistRollingConversationSummary({
-          supabase,
-          sessionId,
-          previousSummary: contextSummary,
-          messages: contextMessages,
-          markerColumn: "ui_message_id",
-          getMarkerKey: (message) => message.id,
-          toUiMessage: (message) => message,
-        });
-
-      contextSummary = persistedSummary.summary;
-      summarizedUiMessageIds = new Set([
-        ...summarizedUiMessageIds,
-        ...persistedSummary.summarizedMessageKeys,
-      ]);
-      contextMessages = filterSummarizedMessages(
-        messages as UIMessage[],
-        summarizedUiMessageIds
-      );
-    } catch (error) {
-      console.error("Failed to persist request conversation summary", error);
+    {
+      evaluateHistoryNeed: evaluateChatHistoryNeed,
     }
-  }
-
-  system = appendSavedConversationSummaryContext(system, contextSummary);
-
-  const preparedContext = await prepareChatModelContext(contextMessages, {
-    summarizeMessages: async (messagesToSummarize) => {
-      const { text } = await generateText({
-        model: openai(getConversationSummaryModelId()),
-        providerOptions: {
-          openai: {
-            reasoningEffort: "none",
-          },
-        },
-        instructions:
-          "You compress earlier chat history for a follow-up AI request. Preserve facts, decisions, constraints, and unresolved user intent. Do not answer the user.",
-        prompt: buildConversationSummaryPrompt(messagesToSummarize),
-      });
-
-      return text;
-    },
-  });
-
-  if (preparedContext.systemContext) {
-    system = `${system}\n\n${preparedContext.systemContext}`;
-  }
+  );
 
   const modelMessages = await convertToModelMessages(preparedContext.messages);
   const reasoningEffort = resolveReasoningEffort(

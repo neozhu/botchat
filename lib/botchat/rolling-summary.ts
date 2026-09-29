@@ -2,15 +2,9 @@ import { generateText, type UIMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { getConversationSummaryModelId } from "@/lib/ai/openai";
 import {
-  buildRollingConversationSummaryPrompt,
+  buildConversationSummaryPrompt,
   selectMessagesForPersistentSummary,
 } from "@/lib/botchat/chat-context";
-
-type RollingSummaryMarkerColumn = "id" | "ui_message_id";
-
-type RollingSummaryMessage = Pick<UIMessage, "role"> & {
-  total_tokens?: number | null;
-};
 
 type PersistChatContextSummaryParams = {
   p_session_id: string;
@@ -20,75 +14,60 @@ type PersistChatContextSummaryParams = {
   p_ui_message_ids: string[] | null;
 };
 
-export type RollingSummaryDatabase = {
+export type ConversationSummaryDatabase = {
   rpc(
     name: "persist_chat_context_summary",
     params: PersistChatContextSummaryParams
   ): PromiseLike<{ error: { message: string } | null }>;
 };
 
-type PersistRollingConversationSummaryOptions<
-  TMessage extends RollingSummaryMessage,
+type PersistConversationSummaryBatchesOptions<
+  TMessage extends Pick<UIMessage, "role"> & { id: string },
 > = {
-  supabase: RollingSummaryDatabase;
+  supabase: ConversationSummaryDatabase;
   sessionId: string;
-  previousSummary: string | null;
   messages: TMessage[];
-  markerColumn: RollingSummaryMarkerColumn;
-  getMarkerKey: (message: TMessage) => string;
   toUiMessage: (message: TMessage) => UIMessage;
 };
 
-export async function persistRollingConversationSummary<
-  TMessage extends RollingSummaryMessage,
+export async function persistConversationSummaryBatches<
+  TMessage extends Pick<UIMessage, "role"> & { id: string },
 >({
   supabase,
   sessionId,
-  previousSummary,
   messages,
-  markerColumn,
-  getMarkerKey,
   toUiMessage,
-}: PersistRollingConversationSummaryOptions<TMessage>) {
-  const messagesToSummarize = selectMessagesForPersistentSummary(messages);
-  if (messagesToSummarize.length === 0) {
-    return {
-      summary: previousSummary,
-      summarizedAt: null,
-      summarizedMessageKeys: [],
-    };
-  }
-
-  const { text } = await generateText({
-    model: openai(getConversationSummaryModelId()),
-    providerOptions: {
-      openai: {
-        reasoningEffort: "none",
+}: PersistConversationSummaryBatchesOptions<TMessage>) {
+  let remainingMessages = messages;
+  let batch = selectMessagesForPersistentSummary(remainingMessages);
+  while (batch.length > 0) {
+    const { text } = await generateText({
+      model: openai(getConversationSummaryModelId()),
+      providerOptions: {
+        openai: {
+          reasoningEffort: "none",
+        },
       },
-    },
-    instructions:
-      "You update a rolling compressed summary of earlier chat history. Preserve facts, decisions, constraints, and unresolved user intent. Do not answer the user.",
-    prompt: buildRollingConversationSummaryPrompt(
-      previousSummary,
-      messagesToSummarize.map(toUiMessage)
-    ),
-  });
+      instructions:
+        "You summarize one independent batch of chat messages for storage. Preserve facts, decisions, constraints, and unresolved user intent. Do not answer the user.",
+      prompt: buildConversationSummaryPrompt(batch.map(toUiMessage)),
+    });
 
-  const summary = text.trim();
-  const summarizedAt = new Date().toISOString();
-  const summarizedMessageKeys = messagesToSummarize.map(getMarkerKey);
+    const summary = text.trim();
+    const summarizedAt = new Date().toISOString();
+    if (!summary) throw new Error("Empty conversation summary.");
 
-  const { error } = await supabase.rpc("persist_chat_context_summary", {
-    p_session_id: sessionId,
-    p_context_summary: summary,
-    p_summarized_at: summarizedAt,
-    p_message_row_ids:
-      markerColumn === "id" ? summarizedMessageKeys : null,
-    p_ui_message_ids:
-      markerColumn === "ui_message_id" ? summarizedMessageKeys : null,
-  });
+    const { error } = await supabase.rpc("persist_chat_context_summary", {
+      p_session_id: sessionId,
+      p_context_summary: summary,
+      p_summarized_at: summarizedAt,
+      p_message_row_ids: batch.map((message) => message.id),
+      p_ui_message_ids: null,
+    });
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
 
-  return { summary, summarizedAt, summarizedMessageKeys };
+    remainingMessages = remainingMessages.slice(batch.length);
+    batch = selectMessagesForPersistentSummary(remainingMessages);
+  }
 }

@@ -1,7 +1,7 @@
 import { generateText, type UIMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { getConversationSummaryModelId } from "@/lib/ai/openai";
-import { persistRollingConversationSummary } from "@/lib/botchat/rolling-summary";
+import { persistConversationSummaryBatches } from "@/lib/botchat/rolling-summary";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   buildSessionTitlePrompt,
@@ -23,7 +23,6 @@ type UnsummarizedMessageRow = {
   ui_message_id: string;
   role: UIMessage["role"];
   parts: unknown;
-  total_tokens: number | null;
 };
 
 function coerceMessages(value: unknown): PersistableUIMessage[] {
@@ -84,56 +83,32 @@ function rowToUiMessage(row: UnsummarizedMessageRow): UIMessage {
   };
 }
 
-async function persistRollingConversationSummaryIfNeeded(
+async function persistConversationSummaryIfNeeded(
   supabase: SupabaseServerClient,
   sessionId: string
 ) {
-  const [sessionResult, unsummarizedMessagesResult] = await Promise.all([
-    supabase
-      .from("chat_sessions")
-      .select("id, context_summary")
-      .eq("id", sessionId)
-      .maybeSingle(),
-    supabase
-      .from("chat_messages")
-      .select("id, ui_message_id, role, parts, total_tokens")
-      .eq("session_id", sessionId)
-      .is("summarized_at", null)
-      .order("position", { ascending: true }),
-  ]);
-
-  if (sessionResult.error) throw new Error(sessionResult.error.message);
+  const unsummarizedMessagesResult = await supabase
+    .from("chat_messages")
+    .select("id, ui_message_id, role, parts")
+    .eq("session_id", sessionId)
+    .is("summarized_at", null)
+    .order("position", { ascending: true });
   if (unsummarizedMessagesResult.error) {
     throw new Error(unsummarizedMessagesResult.error.message);
   }
 
-  const previousSummary =
-    typeof sessionResult.data?.context_summary === "string"
-      ? sessionResult.data.context_summary
-      : null;
   const unsummarizedRows = (unsummarizedMessagesResult.data ?? []).filter(
     (row): row is UnsummarizedMessageRow =>
       typeof row.id === "string" &&
       typeof row.ui_message_id === "string" &&
-      (row.role === "user" || row.role === "assistant") &&
-      (typeof row.total_tokens === "number" || row.total_tokens === null)
+      (row.role === "user" || row.role === "assistant")
   );
-  const persistedSummary = await persistRollingConversationSummary({
+  await persistConversationSummaryBatches({
     supabase,
     sessionId,
-    previousSummary,
     messages: unsummarizedRows,
-    markerColumn: "id",
-    getMarkerKey: (row) => row.id,
     toUiMessage: rowToUiMessage,
   });
-
-  if (persistedSummary.summarizedMessageKeys.length === 0) return null;
-
-  return {
-    summary: persistedSummary.summary,
-    summarizedAt: persistedSummary.summarizedAt,
-  };
 }
 
 async function refreshSessionTotalTokens(
@@ -262,7 +237,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await persistRollingConversationSummaryIfNeeded(supabase, sessionId);
+    await persistConversationSummaryIfNeeded(supabase, sessionId);
   } catch (error) {
     console.error("Failed to persist conversation summary", error);
   }

@@ -118,7 +118,7 @@ $$ language plpgsql;
 comment on column public.chat_sessions.user_id is
   'Authenticated owner of the chat session. Nullable temporarily for legacy anonymous rows until they are backfilled or retired.';
 comment on column public.chat_sessions.context_summary is
-  'Rolling summary of earlier chat messages that should be sent as model context instead of replaying summarized messages.';
+  'Summary of the most recently completed message batch, stored for session search and not sent as model context.';
 comment on column public.chat_sessions.total_tokens is
   'Sum of chat model token usage recorded on messages in this session. Excludes title and summary generation.';
 comment on column public.chat_messages.total_tokens is
@@ -126,7 +126,7 @@ comment on column public.chat_messages.total_tokens is
 comment on column public.chat_messages.position is
   'Zero-based message order within a session, assigned from the client conversation array so user/assistant turns remain stable even when rows are inserted concurrently.';
 comment on column public.chat_messages.summarized_at is
-  'Set when this message has been folded into chat_sessions.context_summary and can be skipped for model context.';
+  'Set after this message has been included in a saved summary batch, so it is not summarized again.';
 
 -- RLS.
 -- Compatibility note:

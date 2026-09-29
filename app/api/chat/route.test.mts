@@ -3,28 +3,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-test("conversation summary uses the configured summary model helper with none reasoning", () => {
-  const routeSource = readFileSync(
-    fileURLToPath(new URL("./route.ts", import.meta.url)),
+test("batch conversation summary uses the configured summary model helper with none reasoning", () => {
+  const helperSource = readFileSync(
+    fileURLToPath(new URL("../../../lib/botchat/rolling-summary.ts", import.meta.url)),
     "utf8"
   );
-
-  assert.doesNotMatch(routeSource, /CONVERSATION_SUMMARY_MODEL_ID/);
-  assert.match(
-    routeSource,
-    /import\s+\{\s*getConversationSummaryModelId,\s*getOpenAIModelId,?\s*\}\s+from\s+"@\/lib\/ai\/openai"/
-  );
-  assert.match(
-    routeSource,
-    /model:\s*openai\(getConversationSummaryModelId\(\)\)/
-  );
-  assert.match(
-    routeSource,
-    /summarizeMessages:[\s\S]*reasoningEffort:\s*"none"/
-  );
+  assert.match(helperSource, /model:\s*openai\(getConversationSummaryModelId\(\)\)/);
+  assert.match(helperSource, /reasoningEffort:\s*"none"/);
 });
 
-test("chat route uses persisted session summary state before runtime compaction", () => {
+test("chat route routes original messages using Jev and loads the expert configuration", () => {
   const routeSource = readFileSync(
     fileURLToPath(new URL("./route.ts", import.meta.url)),
     "utf8"
@@ -32,38 +20,16 @@ test("chat route uses persisted session summary state before runtime compaction"
 
   assert.match(
     routeSource,
-    /appendSavedConversationSummaryContext[\s\S]*filterSummarizedMessages/
+    /prepareRelevantChatModelContext/
   );
   assert.match(
     routeSource,
-    /"expert:experts\(system_prompt, model, reasoning_effort\), context_summary"/
+    /"expert:experts\(system_prompt, model, reasoning_effort\)"/
   );
   assert.match(
     routeSource,
-    /\.select\("ui_message_id"\)[\s\S]*\.not\("summarized_at", "is", null\)/
+    /prepareRelevantChatModelContext\([\s\S]*messages as UIMessage\[\],[\s\S]*evaluateHistoryNeed:\s*evaluateChatHistoryNeed/
   );
-  assert.match(
-    routeSource,
-    /filterSummarizedMessages\([\s\S]*messages as UIMessage\[\],[\s\S]*summarizedUiMessageIds[\s\S]*\)/
-  );
-  assert.match(
-    routeSource,
-    /appendSavedConversationSummaryContext\(system, contextSummary\)/
-  );
-});
-
-test("chat route persists a rolling request summary before runtime compaction", () => {
-  const routeSource = readFileSync(
-    fileURLToPath(new URL("./route.ts", import.meta.url)),
-    "utf8"
-  );
-
-  assert.match(
-    routeSource,
-    /persistRollingConversationSummary\(\{[\s\S]*messages:\s*contextMessages[\s\S]*markerColumn:\s*"ui_message_id"/
-  );
-  assert.match(routeSource, /getMarkerKey:\s*\(message\)\s*=>\s*message\.id/);
-  assert.match(routeSource, /summarizedMessageKeys/);
 });
 
 test("chat route appends expert-requested skill instructions", () => {

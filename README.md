@@ -22,6 +22,21 @@ Built with **Next.js (App Router)** + **Vercel AI SDK** + **Supabase**.
 - **Attachments**: upload images/files to Supabase Storage and send them with messages.
 - **Markdown + code blocks**: readable rendering with syntax highlighting.
 
+## Architecture
+
+Generated with [Archify](https://github.com/tt-a1i/archify) from the repository source. The diagram shows the server bootstrap, client chat flow, persistence, and external integrations.
+
+![Botchat architecture: server bootstrap, two-panel chat dashboard, Next.js API routes, Supabase, and AI integrations](docs/architecture/botchat.svg)
+
+[Interactive architecture diagram](.archify/architecture-botchat-20261005-065517/botchat.html) · [Diagram source](.archify/architecture-botchat-20261005-065517/candidate.json)
+
+Download the HTML and open it in a browser to explore component details, pinned source links, themes, and image exports.
+
+- **Server bootstrap**: `app/page.tsx` verifies the Supabase user and redirects guests to `/auth`. `lib/botchat/bootstrap.ts` loads experts, sessions, and the active conversation before rendering the dashboard.
+- **Client chat flow**: `components/botchat/dashboard.tsx` coordinates `SessionsPanel`, `ChatPanel`, `useChat`, session switching, optimistic updates, uploads, and debounced message persistence. Chat rendering reuses `ai-elements` and shared `ui` components.
+- **API and model context**: `/api/chat` resolves the expert prompt, model, and reasoning effort, loads referenced local skills, selects relevant history through optional TypeSafe/Jev evaluation, and streams OpenAI replies. Missing or failed Jev evaluation falls back to the previous turn and current message. Separate routes handle sessions, experts, prompt generation, and configurable ASR/TTS services.
+- **Persistence and attachments**: Supabase Postgres stores shared experts and user-owned sessions/messages protected by RLS. `/api/messages/sync` saves messages, titles, previews, token totals, and complete summary batches; saved summaries support session search and are excluded from chat context. `/api/attachments/upload` stores files in the public `chat-attachments` bucket and returns URLs before the client sends the message.
+
 ## Quickstart (local)
 
 ### 1) Configure env

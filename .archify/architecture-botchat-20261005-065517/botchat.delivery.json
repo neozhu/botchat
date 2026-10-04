@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "4003e349-04fb-4ee6-9424-7d322f81d81c",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\github\\botchat\\.archify\\architecture-botchat-20261005-065517\\candidate.json",
+  "output": "D:\\github\\botchat\\.archify\\architecture-botchat-20261005-065517\\botchat.html",
+  "specification": {
+    "sha256": "4986455fa0d1af9228507e85ce6254e495ee9e28a479ca7738192465d6ffdef0",
+    "bytes": 10013
+  },
+  "artifact": {
+    "sha256": "2b5751d217869bca0c49787f56b45cd68380ab7c3d3da0479ed5a649c9030a27",
+    "bytes": 774693
+  }
+}

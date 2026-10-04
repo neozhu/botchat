@@ -1,0 +1,432 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Botchat Architecture",
+    "locale": "en",
+    "output": ".archify/architecture-botchat-20261005-065517/botchat.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/neozhu/botchat.git",
+      "provider": "github",
+      "revision": "41ef068edb7b1354dca60c7e93bff78256273446",
+      "link_mode": "web"
+    }
+  },
+  "components": [
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Supabase Auth",
+      "sublabel": "Sign in / sign up / session cookies",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        230,
+        82
+      ],
+      "sources": [
+        {
+          "path": "app/auth/actions.ts",
+          "line": 40,
+          "end_line": 109
+        },
+        {
+          "path": "lib/auth/user.ts",
+          "line": 6,
+          "end_line": 15
+        },
+        {
+          "path": "lib/supabase/proxy.ts",
+          "line": 5,
+          "end_line": 34
+        }
+      ]
+    },
+    {
+      "id": "bootstrap",
+      "type": "backend",
+      "label": "Server Bootstrap",
+      "sublabel": "app/page.tsx + bootstrap",
+      "tag": "Redirect guests to /auth",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "app/page.tsx",
+          "line": 8,
+          "end_line": 17
+        },
+        {
+          "path": "lib/botchat/bootstrap.ts",
+          "line": 11,
+          "end_line": 36
+        },
+        {
+          "path": "lib/botchat/server-data.ts",
+          "line": 116,
+          "end_line": 165
+        }
+      ]
+    },
+    {
+      "id": "dashboard",
+      "type": "frontend",
+      "label": "Two-panel Chat Dashboard",
+      "sublabel": "SessionsPanel + ChatPanel",
+      "tag": "React 19 · useChat",
+      "pos": [
+        420,
+        240
+      ],
+      "size": [
+        270,
+        86
+      ],
+      "sources": [
+        {
+          "path": "components/botchat/dashboard.tsx",
+          "line": 174,
+          "end_line": 203
+        },
+        {
+          "path": "components/botchat/dashboard.tsx",
+          "line": 672,
+          "end_line": 715
+        },
+        {
+          "path": "components/botchat/dashboard.tsx",
+          "line": 779,
+          "end_line": 947
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "type": "external",
+      "label": "Configurable Voice APIs",
+      "sublabel": "ASR transcription / TTS audio",
+      "tag": "On-demand calls",
+      "pos": [
+        840,
+        240
+      ],
+      "size": [
+        240,
+        86
+      ],
+      "sources": [
+        {
+          "path": "app/api/audio/transcriptions/route.ts",
+          "line": 14,
+          "end_line": 49
+        },
+        {
+          "path": "app/api/audio/speech/route.ts",
+          "line": 18,
+          "end_line": 39
+        },
+        {
+          "path": "lib/botchat/tts.ts",
+          "line": 14,
+          "end_line": 43
+        }
+      ]
+    },
+    {
+      "id": "database",
+      "type": "database",
+      "label": "Supabase Postgres",
+      "sublabel": "experts / sessions / messages",
+      "tag": "User-owned chats via RLS",
+      "pos": [
+        40,
+        535
+      ],
+      "size": [
+        230,
+        96
+      ],
+      "sources": [
+        {
+          "path": "supabase/schema.sql",
+          "line": 9,
+          "end_line": 61
+        },
+        {
+          "path": "supabase/schema.sql",
+          "line": 136,
+          "end_line": 234
+        },
+        {
+          "path": "lib/botchat/server-data.ts",
+          "line": 180,
+          "end_line": 257
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Next.js Route Handlers",
+      "sublabel": "Chat / sync / sessions / experts / files",
+      "tag": "AI SDK 7 · Supabase clients",
+      "pos": [
+        420,
+        535
+      ],
+      "size": [
+        270,
+        96
+      ],
+      "sources": [
+        {
+          "path": "app/api/chat/route.ts",
+          "line": 100,
+          "end_line": 223
+        },
+        {
+          "path": "app/api/messages/sync/route.ts",
+          "line": 147,
+          "end_line": 263
+        },
+        {
+          "path": "app/api/attachments/upload/route.ts",
+          "line": 13,
+          "end_line": 65
+        }
+      ]
+    },
+    {
+      "id": "openai",
+      "type": "cloud",
+      "label": "OpenAI",
+      "sublabel": "Chat / titles / summaries / prompts",
+      "tag": "Expert model or environment config",
+      "pos": [
+        840,
+        535
+      ],
+      "size": [
+        240,
+        96
+      ],
+      "sources": [
+        {
+          "path": "app/api/chat/route.ts",
+          "line": 177,
+          "end_line": 223
+        },
+        {
+          "path": "lib/ai/openai.ts",
+          "line": 1,
+          "end_line": 11
+        },
+        {
+          "path": "lib/botchat/rolling-summary.ts",
+          "line": 33,
+          "end_line": 73
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "cloud",
+      "label": "Supabase Storage",
+      "sublabel": "Public chat-attachments bucket",
+      "tag": "Upload returns FileUIPart URLs",
+      "pos": [
+        40,
+        845
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "app/api/attachments/upload/route.ts",
+          "line": 5,
+          "end_line": 60
+        },
+        {
+          "path": "lib/supabase/public-server.ts",
+          "line": 13,
+          "end_line": 24
+        }
+      ]
+    },
+    {
+      "id": "skills",
+      "type": "database",
+      "label": "Local skills/ Files",
+      "sublabel": "Prompt-selected skills + resource index",
+      "tag": "Appended to system instructions",
+      "pos": [
+        420,
+        845
+      ],
+      "size": [
+        270,
+        86
+      ],
+      "sources": [
+        {
+          "path": "lib/botchat/skills.ts",
+          "line": 22,
+          "end_line": 47
+        },
+        {
+          "path": "lib/botchat/skills.ts",
+          "line": 108,
+          "end_line": 189
+        },
+        {
+          "path": "app/api/chat/route.ts",
+          "line": 159,
+          "end_line": 162
+        }
+      ]
+    },
+    {
+      "id": "jev",
+      "type": "external",
+      "label": "TypeSafe · Jev",
+      "sublabel": "History relevance by conversation turn",
+      "tag": "Optional · fallback to previous turn",
+      "pos": [
+        840,
+        845
+      ],
+      "size": [
+        240,
+        86
+      ],
+      "sources": [
+        {
+          "path": "lib/ai/typesafe.ts",
+          "line": 8,
+          "end_line": 76
+        },
+        {
+          "path": "lib/botchat/chat-context.ts",
+          "line": 201,
+          "end_line": 264
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "check-user",
+      "from": "bootstrap",
+      "to": "auth",
+      "label": "Verify user",
+      "variant": "security"
+    },
+    {
+      "id": "bootstrap-read",
+      "from": "bootstrap",
+      "to": "database",
+      "label": "Bootstrap reads"
+    },
+    {
+      "id": "hydrate-dashboard",
+      "from": "bootstrap",
+      "to": "dashboard",
+      "label": "initialData",
+      "variant": "emphasis"
+    },
+    {
+      "id": "client-requests",
+      "from": "dashboard",
+      "to": "api",
+      "label": "HTTP requests",
+      "variant": "emphasis"
+    },
+    {
+      "id": "reply-stream",
+      "from": "api",
+      "to": "dashboard",
+      "label": "UI message stream",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-database",
+      "from": "api",
+      "to": "database",
+      "label": "Read/write + RPC"
+    },
+    {
+      "id": "api-generation",
+      "from": "api",
+      "to": "openai",
+      "label": "AI SDK",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-voice",
+      "from": "api",
+      "to": "voice",
+      "label": "Optional speech",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-upload",
+      "from": "api",
+      "to": "storage",
+      "label": "File upload"
+    },
+    {
+      "id": "api-skills",
+      "from": "api",
+      "to": "skills",
+      "label": "Prompt-selected read",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-history",
+      "from": "api",
+      "to": "jev",
+      "label": "History relevance",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Bootstrap and Client State",
+      "items": [
+        "Home verifies the user, then bootstrap loads experts and sessions in parallel and fetches the active conversation.",
+        "Dashboard coordinates session switching, useChat, optimistic updates, uploads, and debounced message sync.",
+        "SessionsPanel exposes expert settings; ChatPanel composes ai-elements and shared ui components."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Persistence and Ownership",
+      "items": [
+        "Experts are shared. chat_sessions.user_id owns sessions; chat_messages inherit ownership through session_id and RLS.",
+        "messages/sync upserts messages and updates titles, previews, and token totals. summarize=true triggers complete summary batches saved through an RPC.",
+        "Saved summaries support storage and session search, and are excluded from chat context. Expert deletion uses a server admin client to remove all linked chats."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Context and Optional Capabilities",
+      "items": [
+        "Chat resolves the expert prompt, model, and reasoning effort. Referenced skills/ files extend instructions; tools include current server time and opt-in web_search.",
+        "With history, Jev selects relevant conversation turns. A missing key, five-second timeout, or request failure falls back to the previous turn plus the current message.",
+        "Audio routes proxy configured ASR and TTS services. Attachments upload first; public file URLs are then sent with the message."
+      ]
+    }
+  ]
+}

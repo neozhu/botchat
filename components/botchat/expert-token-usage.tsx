@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { summarizeExpertTokenUsage, type ExpertTokenTotal } from "@/lib/botchat/expert-token-usage";
 
 const colors = ["#6558d3", "#46a59a", "#e5a64b", "#d87593", "#9581cb", "#659dc0", "#94ac62", "#d98260"];
@@ -40,17 +42,22 @@ export function ExpertTokenUsage({ open, experts }: { open: boolean; experts: { 
 
   return (
     <section className="mt-4 rounded-2xl border border-indigo-950/10 bg-gradient-to-br from-white via-white to-indigo-50/60 p-4 shadow-[0_8px_24px_-20px_rgba(67,56,160,0.4)]" aria-label="Expert token usage">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-xs font-semibold text-foreground">Token usage</h3>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">By expert</p>
-        </div>
-        {usage && !error && summary.total > 0 ? (
-          <span className="rounded-full bg-indigo-100/70 px-2 py-1 text-[10px] font-medium text-indigo-700">
-            {summary.experts.length} {summary.experts.length === 1 ? "expert" : "experts"}
+      <Collapsible>
+        <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <span>
+            <span className="block text-xs font-semibold text-foreground">Token usage</span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">By expert</span>
           </span>
-        ) : null}
-      </div>
+          <span className="flex items-center gap-2">
+            {usage && !error && summary.total > 0 ? (
+              <span className="rounded-full bg-indigo-100/70 px-2 py-1 text-[10px] font-medium text-indigo-700">
+                {summary.experts.length} {summary.experts.length === 1 ? "expert" : "experts"}
+              </span>
+            ) : null}
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden="true" />
+          </span>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
       {error ? <p className="mt-3 text-xs text-muted-foreground">Unable to load token usage.</p> : !usage ? (
         <p className="mt-3 text-xs text-muted-foreground">Loading token usage…</p>
       ) : summary.total === 0 ? (
@@ -81,6 +88,8 @@ export function ExpertTokenUsage({ open, experts }: { open: boolean; experts: { 
         </div>
       )}
       <p className="mt-3 border-t border-indigo-950/5 pt-2 text-[10px] leading-relaxed text-muted-foreground">Chat model usage; excludes titles and summaries.</p>
+        </CollapsibleContent>
+      </Collapsible>
     </section>
   );
 }

@@ -8,9 +8,9 @@ const siteUrl =
     ? `https://${process.env.VERCEL_URL}`
     : "http://localhost:3000");
 
-const geistFont = localFont({
-  src: "../public/fonts/geist/Geist-Variable.woff2",
-  variable: "--font-geist",
+const interFont = localFont({
+  src: "../public/fonts/inter/InterVariable.woff2",
+  variable: "--font-inter",
   weight: "100 900",
   style: "normal",
   display: "swap",
@@ -75,7 +75,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={geistFont.variable}>
+    <html lang="en" className={interFont.variable}>
       <body className="antialiased">{children}</body>
     </html>
   );

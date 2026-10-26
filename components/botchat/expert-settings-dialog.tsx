@@ -30,6 +30,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+import { ExpertTokenUsage } from "@/components/botchat/expert-token-usage";
 import {
   getExpertListIntroTimeoutMs,
   formatExpertSaveError,
@@ -840,7 +841,7 @@ export function ExpertSettingsDialog({
           showCloseButton
         >
           <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] xl:grid-cols-[420px_1fr]">
-            <div className="border-b border-white/30 bg-white/70 p-4 md:border-b-0 md:border-r">
+            <div className="flex flex-col border-b border-white/30 bg-white/70 p-4 md:border-b-0 md:border-r">
               <div className="flex items-start justify-between gap-3">
                 <DialogHeader className="text-left">
                   <DialogTitle className="font-[var(--font-display)] tracking-tight">
@@ -889,7 +890,7 @@ export function ExpertSettingsDialog({
                 onDragEnd={(event) => void handleDragEnd(event)}
                 onDragCancel={handleDragCancel}
               >
-                <ScrollArea className="h-[52vh] pr-2 md:h-[64vh]">
+                <ScrollArea className="h-[30vh] pr-2 md:h-[38vh]">
                   <div className="space-y-2">
                     {isLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
@@ -942,6 +943,9 @@ export function ExpertSettingsDialog({
                     )
                   : null}
               </DndContext>
+              <div className="mt-auto">
+                <ExpertTokenUsage open={open} experts={experts} />
+              </div>
             </div>
 
             <div className="p-5 pr-14 md:p-6 md:pr-16">

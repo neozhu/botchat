@@ -1,3 +1,7 @@
+import { extractEnglishSpeechText } from "./tts-text.ts";
+
+export { extractEnglishSpeechText };
+
 type TtsSpeechEnv = {
   [key: string]: string | undefined;
   TTS_API_KEY?: string;
@@ -32,6 +36,9 @@ export function getTtsSpeechConfig(env: TtsSpeechEnv = process.env): TtsSpeechCo
 }
 
 export function buildTtsSpeechRequest(input: string, config: TtsSpeechConfig) {
+  const speechText = extractEnglishSpeechText(input);
+  if (!speechText) throw new Error("No English text to read.");
+
   return {
     url: config.apiUrl,
     init: {
@@ -41,7 +48,7 @@ export function buildTtsSpeechRequest(input: string, config: TtsSpeechConfig) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        input: input.trim(),
+        input: speechText,
         voice: config.voice,
         speed: 1,
         lang: "en-us",

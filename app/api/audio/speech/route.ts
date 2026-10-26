@@ -1,4 +1,8 @@
-import { buildTtsSpeechRequest, getTtsSpeechConfig } from "@/lib/botchat/tts";
+import {
+  buildTtsSpeechRequest,
+  extractEnglishSpeechText,
+  getTtsSpeechConfig,
+} from "@/lib/botchat/tts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -15,9 +19,14 @@ export async function POST(request: Request) {
     return Response.json({ error: "Missing speech input." }, { status: 400 });
   }
 
+  const speechText = extractEnglishSpeechText(input);
+  if (!speechText) {
+    return Response.json({ error: "No English text to read." }, { status: 400 });
+  }
+
   let speechRequest: ReturnType<typeof buildTtsSpeechRequest>;
   try {
-    speechRequest = buildTtsSpeechRequest(input, getTtsSpeechConfig());
+    speechRequest = buildTtsSpeechRequest(speechText, getTtsSpeechConfig());
   } catch (error) {
     console.error("TTS configuration is incomplete", error);
     return Response.json({ error: "TTS service is not configured." }, { status: 500 });

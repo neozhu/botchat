@@ -38,6 +38,7 @@ import {
   shouldPreventClipboardPasteDefault,
 } from "@/lib/botchat/chat-clipboard";
 import { getComposerTextareaSizing } from "@/lib/botchat/chat-composer";
+import { extractEnglishSpeechText } from "@/lib/botchat/tts-text";
 import { formatTimelineDay, getTimelineDayKey } from "@/lib/botchat/chat-timeline";
 import { VoiceInputButton } from "@/components/botchat/VoiceInputButton";
 import {
@@ -214,6 +215,7 @@ const MessageBubble = memo(function MessageBubble({
   const isUser = message.role === "user";
   const hasText = text.trim().length > 0;
   const canCopyResponse = !isUser && hasText;
+  const speechInput = useMemo(() => isUser ? "" : extractEnglishSpeechText(text), [isUser, text]);
   const [copied, setCopied] = useState(false);
   const [speechState, setSpeechState] = useState<SpeechState>("idle");
   const resetCopyStateTimeoutRef = useRef<number | null>(null);
@@ -275,7 +277,7 @@ const MessageBubble = memo(function MessageBubble({
   };
 
   const handleReadResponse = async () => {
-    const input = text.trim();
+    const input = speechInput;
     if (!input || speechState !== "idle") return;
 
     const abortController = new AbortController();
@@ -339,7 +341,7 @@ const MessageBubble = memo(function MessageBubble({
       ? "Preparing speech"
       : speechState === "playing"
         ? "Reading response aloud"
-        : "Read response aloud";
+        : speechInput ? "Read response aloud" : "No English text to read";
   const isSpeechActive = speechState !== "idle";
 
   return (
@@ -446,7 +448,7 @@ const MessageBubble = memo(function MessageBubble({
               size="icon"
               variant="ghost"
               aria-label={speechLabel}
-              disabled={isSpeechActive}
+              disabled={isSpeechActive || !speechInput}
               className={cn(
                 "h-7 w-7 rounded-full border border-white/12 bg-black/20 text-white/80 opacity-0 shadow-sm backdrop-blur-sm transition-opacity duration-150 pointer-events-none group-hover/message:opacity-100 group-hover/message:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:bg-black/30 hover:text-white [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 disabled:pointer-events-none disabled:opacity-100",
                 isSpeechActive &&

@@ -16,8 +16,10 @@ import {
 } from "@/lib/ai/reasoning-effort";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOpenAIModelId } from "@/lib/ai/openai";
-import { evaluateChatHistoryNeed } from "@/lib/ai/typesafe";
-import { prepareRelevantChatModelContext } from "@/lib/botchat/chat-context";
+import {
+  ChatContextTooLargeError,
+  prepareChatModelContext,
+} from "@/lib/botchat/chat-context";
 import {
   appendChatSkillInstructions,
   loadChatSkillsForPrompt,
@@ -169,12 +171,15 @@ export async function POST(request: Request) {
     system = `${system}\n\n${buildCurrentSystemDateTimeContext()}`;
   }
 
-  const preparedContext = await prepareRelevantChatModelContext(
-    messages as UIMessage[],
-    {
-      evaluateHistoryNeed: evaluateChatHistoryNeed,
+  let preparedContext;
+  try {
+    preparedContext = await prepareChatModelContext(messages as UIMessage[]);
+  } catch (error) {
+    if (error instanceof ChatContextTooLargeError) {
+      return Response.json({ error: error.message }, { status: 413 });
     }
-  );
+    throw error;
+  }
 
   const modelMessages = await convertToModelMessages(preparedContext.messages);
   const reasoningEffort = resolveReasoningEffort(

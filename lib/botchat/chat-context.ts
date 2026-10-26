@@ -1,7 +1,9 @@
 import type { UIMessage } from "ai";
+import { countTokens } from "gpt-tokenizer";
 
 const CHAT_CONTEXT_DEFAULTS = {
   compactAfterUserMessageCount: 6,
+  maxTokens: 20_000,
   savedSummaryContextPrefix:
     "Conversation summary before the latest unsummarized messages:",
 } as const;
@@ -9,43 +11,37 @@ const CHAT_CONTEXT_DEFAULTS = {
 const CHAT_CONTEXT_ENV = {
   // Keep the existing env name; this counts all messages, including assistant replies.
   compactAfterUserMessageCount: "BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT",
+  maxTokens: "BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS",
 } as const;
 
 type PrepareChatModelContextOptions = {
-  compactAfterUserMessageCount?: number;
-  summarizeMessages?: (messages: UIMessage[]) => Promise<string>;
+  maxMessages?: number;
+  maxTokens?: number;
 };
 
 type PreparedChatModelContext = {
   messages: UIMessage[];
-  systemContext?: string;
+  tokenCount: number;
   compacted: boolean;
 };
 
-export type ChatHistoryRelevanceState = {
-  currentMessage: string;
-  recentTurns: {
-    messages: { id: string; role: UIMessage["role"]; text: string }[];
-  }[];
-};
-
-export type ChatHistorySelection = {
-  messageIds: string[];
-};
-
-type PrepareRelevantChatModelContextOptions = {
-  evaluateHistoryNeed: (state: ChatHistoryRelevanceState) => Promise<ChatHistorySelection>;
-};
+export class ChatContextTooLargeError extends Error {
+  constructor(maxTokens: number) {
+    super(`The current request exceeds the ${maxTokens} token context budget. Please shorten your message or remove attachments.`);
+    this.name = "ChatContextTooLargeError";
+  }
+}
 
 type ChatContextEnv = Record<string, string | undefined>;
 
 export type ChatContextConfig = {
   compactAfterUserMessageCount: number;
+  maxTokens: number;
 };
 
 function positiveIntegerFromEnv(value: string | undefined, fallback: number) {
   const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 export function getChatContextConfig(
@@ -55,6 +51,10 @@ export function getChatContextConfig(
     compactAfterUserMessageCount: positiveIntegerFromEnv(
       env[CHAT_CONTEXT_ENV.compactAfterUserMessageCount],
       CHAT_CONTEXT_DEFAULTS.compactAfterUserMessageCount
+    ),
+    maxTokens: positiveIntegerFromEnv(
+      env[CHAT_CONTEXT_ENV.maxTokens],
+      CHAT_CONTEXT_DEFAULTS.maxTokens
     ),
   };
 }
@@ -154,111 +154,47 @@ export function selectMessagesForPersistentSummary<TMessage extends Pick<UIMessa
     : [];
 }
 
+// Tokenize role/parts, including file descriptors and tool inputs/results, rather
+// than stored usage metadata (which includes previous requests and output).
+// This is a local o200k_base estimate; provider-side image/PDF processing,
+// system instructions, tool declarations and generated output are outside it.
+function messageTokenCount(message: UIMessage) {
+  return countTokens(JSON.stringify({ role: message.role, parts: message.parts }), {
+    disallowedSpecial: new Set(),
+  });
+}
+
 export async function prepareChatModelContext(
   messages: UIMessage[],
   options: PrepareChatModelContextOptions = {}
 ): Promise<PreparedChatModelContext> {
-  const compactAfterUserMessageCount =
-    options.compactAfterUserMessageCount ??
-    getChatContextConfig().compactAfterUserMessageCount;
-
-  if (messages.length < compactAfterUserMessageCount) {
-    return {
-      messages,
-      compacted: false,
-    };
-  }
-
-  const retainedMessages = messages.slice(-2);
-  const messagesToSummarize = messages.slice(
-    0,
-    Math.max(0, messages.length - retainedMessages.length)
+  const config = getChatContextConfig();
+  const maxMessages = options.maxMessages ?? config.compactAfterUserMessageCount;
+  const maxTokens = options.maxTokens ?? config.maxTokens;
+  const latestUserIndex = messages.findLastIndex((message) => message.role === "user");
+  // Keep the current user request and any following tool continuation together.
+  const protectedStartIndex = latestUserIndex >= 0
+    ? latestUserIndex
+    : Math.max(0, messages.length - 1);
+  let startIndex = Math.min(
+    Math.max(0, messages.length - maxMessages),
+    protectedStartIndex
   );
+  const tokenCounts = messages.slice(startIndex).map(messageTokenCount);
+  let tokenCount = tokenCounts.reduce((total, count) => total + count, 0);
+  let removedCount = 0;
 
-  if (!options.summarizeMessages || messagesToSummarize.length === 0) {
-    return {
-      messages: retainedMessages,
-      compacted: true,
-    };
+  while (tokenCount > maxTokens && startIndex < protectedStartIndex) {
+    tokenCount -= tokenCounts[removedCount];
+    removedCount += 1;
+    startIndex += 1;
   }
 
-  let summary = "";
-  try {
-    summary = (await options.summarizeMessages(messagesToSummarize)).trim();
-  } catch {
-    summary = "";
-  }
+  if (tokenCount > maxTokens) throw new ChatContextTooLargeError(maxTokens);
 
   return {
-    messages: retainedMessages,
-    systemContext: summary
-      ? `Conversation summary before the latest messages:\n${summary}`
-      : undefined,
-    compacted: true,
-  };
-}
-
-export async function prepareRelevantChatModelContext(
-  messages: UIMessage[],
-  options: PrepareRelevantChatModelContextOptions
-): Promise<PreparedChatModelContext> {
-  const userMessageIndices = messages.flatMap((message, index) =>
-    message.role === "user" ? [index] : []
-  );
-  const currentMessageIndex = userMessageIndices.at(-1);
-  if (currentMessageIndex === undefined) return { messages, compacted: false };
-
-  const currentMessages = messages.slice(currentMessageIndex);
-  const previousTurnIndices = userMessageIndices.slice(0, -1);
-  if (previousTurnIndices.length === 0) {
-    return { messages: currentMessages, compacted: false };
-  }
-
-  const historyMessageCount = getChatContextConfig().compactAfterUserMessageCount;
-  const windowStartIndex = Math.max(0, currentMessageIndex - historyMessageCount);
-  // Include the entire turn if the message window begins inside a reply.
-  const recentStartIndex = previousTurnIndices.findLast(
-    (index) => index <= windowStartIndex
-  ) ?? previousTurnIndices[0];
-  const recentTurnIndices = previousTurnIndices.filter((index) => index >= recentStartIndex);
-  const recentTurns = recentTurnIndices.map((index, turnIndex) =>
-    messages.slice(index, recentTurnIndices[turnIndex + 1] ?? currentMessageIndex)
-  );
-  const recentMessages = recentTurns.flat();
-  const candidateIds = new Set(recentMessages.map((message) => message.id));
-  let selection: ChatHistorySelection;
-  try {
-    selection = await options.evaluateHistoryNeed({
-      currentMessage: formatConversationTranscript(currentMessages),
-      recentTurns: recentTurns.map((turn) => ({
-        messages: turn.map((message) => ({
-          id: message.id,
-          role: message.role,
-          text: messageText(message),
-        })),
-      })),
-    });
-    if (
-      !selection ||
-      !Array.isArray(selection.messageIds) ||
-      selection.messageIds.some((id) => !candidateIds.has(id))
-    ) {
-      throw new Error("Invalid history message selection.");
-    }
-  } catch {
-    // Use the original turn even if its messages have already been summarized.
-    const previousTurnIndex = previousTurnIndices.at(-1) ?? currentMessageIndex;
-    return { messages: messages.slice(previousTurnIndex), compacted: false };
-  }
-
-  const selectedIds = new Set(selection.messageIds);
-  return {
-    messages: [
-      ...recentTurns
-        .filter((turn) => turn.some((message) => selectedIds.has(message.id)))
-        .flat(),
-      ...currentMessages,
-    ],
-    compacted: false,
+    messages: messages.slice(startIndex),
+    tokenCount,
+    compacted: startIndex > 0,
   };
 }

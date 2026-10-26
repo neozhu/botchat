@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { UIMessage } from "ai";
-import * as chatContext from "./chat-context.ts";
 
 import {
   appendSavedConversationSummaryContext,
@@ -49,6 +48,7 @@ async function withoutChatContextEnv<T>(run: () => T | Promise<T>) {
 test("getChatContextConfig keeps default compaction thresholds when env vars are absent", () => {
   assert.deepEqual(getChatContextConfig({}), {
     compactAfterUserMessageCount: 6,
+    maxTokens: 20_000,
   });
 });
 
@@ -60,6 +60,7 @@ test("getChatContextConfig reads positive integer compaction thresholds from env
     }),
     {
       compactAfterUserMessageCount: 7,
+      maxTokens: 2400,
     }
   );
 });
@@ -72,6 +73,7 @@ test("getChatContextConfig ignores invalid compaction threshold env values", () 
     }),
     {
       compactAfterUserMessageCount: 6,
+      maxTokens: 20_000,
     }
   );
 });
@@ -87,30 +89,7 @@ test("prepareChatModelContext keeps the full conversation below the message thre
     context.messages.map((message) => message.id),
     ["m1", "m2", "m3", "m4", "m5"]
   );
-  assert.equal(context.systemContext, undefined);
-});
-
-test("prepareChatModelContext summarizes older messages when compaction is needed", async () => {
-  const messages = Array.from({ length: 8 }, (_, index) =>
-    textMessage(`m${index + 1}`, index % 2 === 0 ? "user" : "assistant", `message ${index + 1}`)
-  );
-  const summarizedIds: string[] = [];
-
-  const context = await prepareChatModelContext(messages, {
-    compactAfterUserMessageCount: 4,
-    summarizeMessages: async (messagesToSummarize) => {
-      summarizedIds.push(...messagesToSummarize.map((message) => message.id));
-      return "The user prefers durable constraints from earlier turns.";
-    },
-  });
-
-  assert.deepEqual(summarizedIds, ["m1", "m2", "m3", "m4", "m5", "m6"]);
-  assert.deepEqual(
-    context.messages.map((message) => message.id),
-    ["m7", "m8"]
-  );
-  assert.match(context.systemContext ?? "", /durable constraints/i);
-  assert.equal(context.compacted, true);
+  assert.equal(Object.hasOwn(context, "systemContext"), false);
 });
 
 test("filterSummarizedMessages removes messages covered by the saved summary", () => {
@@ -158,37 +137,6 @@ test("selectMessagesForPersistentSummary ignores token usage before a complete m
   });
 });
 
-test("prepareChatModelContext counts user and assistant messages toward the env threshold", async () => {
-  const previous = process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT;
-  process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "5";
-
-  try {
-    const messages = [
-      textMessage("m1", "user", "first user message"),
-      textMessage("m2", "assistant", "first assistant response"),
-      textMessage("m3", "user", "second user message"),
-      textMessage("m4", "assistant", "second assistant response"),
-      textMessage("m5", "user", "third user message"),
-      textMessage("m6", "assistant", "third assistant response"),
-      textMessage("m7", "user", "fourth user message"),
-    ];
-
-    const context = await prepareChatModelContext(messages, {
-      summarizeMessages: async () => "Earlier discussion summary.",
-    });
-
-    assert.equal(context.compacted, true);
-    assert.deepEqual(context.messages.map((message) => message.id), ["m6", "m7"]);
-    assert.match(context.systemContext ?? "", /Earlier discussion summary/);
-  } finally {
-    if (previous === undefined) {
-      delete process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT;
-    } else {
-      process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = previous;
-    }
-  }
-});
-
 test("selectMessagesForPersistentSummary triggers at six unsummarized messages across three turns", () => {
   return withoutChatContextEnv(() => {
     const messages = [
@@ -232,7 +180,7 @@ test("selectMessagesForPersistentSummary selects exactly the configured message 
   assert.deepEqual(selectMessagesForPersistentSummary(messages).map((message) => message.id), ["u1", "a1", "u2"]);
 }));
 
-test("selectMessagesForPersistentSummary ignores the old token threshold setting", () => {
+test("selectMessagesForPersistentSummary ignores the chat token budget", () => {
   const previous = process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS;
   process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS = "1";
 
@@ -295,233 +243,111 @@ test("buildConversationSummaryPrompt preserves code context in the batch", () =>
   assert.match(prompt, /file paths, function names, error messages, decisions, constraints, and pending next steps/i);
 });
 
-test("prepareChatModelContext keeps latest two messages when summarization fails", async () => {
-  const messages = Array.from({ length: 4 }, (_, index) =>
-    textMessage(`m${index + 1}`, index % 2 === 0 ? "user" : "assistant", `message ${index + 1}`)
+function conversation(count: number, text = "Short message"): UIMessage[] {
+  return Array.from({ length: count }, (_, index) =>
+    textMessage(`m${index + 1}`, index % 2 === 0 ? "user" : "assistant", text)
   );
+}
 
-  const context = await prepareChatModelContext(messages, {
-    compactAfterUserMessageCount: 2,
-    summarizeMessages: async () => {
-      throw new Error("summary failed");
-    },
-  });
-
-  assert.deepEqual(
-    context.messages.map((message) => message.id),
-    ["m3", "m4"]
-  );
-  assert.equal(context.systemContext, undefined);
-  assert.equal(context.compacted, true);
-});
-
-test("relevant context keeps only the previous complete turn when Jev fails", async () => {
-  const messages = [
-    textMessage("u1", "user", "Earlier topic"),
-    textMessage("a1", "assistant", "Earlier answer"),
-    textMessage("u2", "user", "Previous question"),
-    textMessage("a2", "assistant", "Previous answer"),
-    textMessage("u3", "user", "Current question"),
-  ];
-  const context = await chatContext.prepareRelevantChatModelContext(messages, {
-    evaluateHistoryNeed: async () => {
-      throw new Error("Jev unavailable");
-    },
-  });
-
-  assert.deepEqual(context.messages.map((message) => message.id), ["u2", "a2", "u3"]);
-  assert.equal(context.systemContext, undefined);
-});
-
-test("relevant context drops history for an independent question while preserving attachments", async () => {
-  const currentMessage: UIMessage = {
-    id: "u2",
-    role: "user",
-    parts: [{ type: "file", mediaType: "image/png", url: "https://example.com/new.png", filename: "new.png" }],
-  };
-  const context = await chatContext.prepareRelevantChatModelContext([
-    textMessage("u1", "user", "Earlier question"),
-    textMessage("a1", "assistant", "Earlier answer"),
-    currentMessage,
-  ], {
-    evaluateHistoryNeed: async () => ({ messageIds: [] }),
-  });
-
-  assert.deepEqual(context.messages, [currentMessage]);
-  assert.equal(context.systemContext, undefined);
-});
-
-test("relevant context preserves selected raw messages without exposing a saved summary to either model", async () => {
-  let evaluatedState: chatContext.ChatHistoryRelevanceState | undefined;
-  const options = {
-    contextSummary: "Saved older facts",
-    evaluateHistoryNeed: async (state: chatContext.ChatHistoryRelevanceState) => {
-      evaluatedState = state;
-      return { messageIds: ["a1", "u2"], includeSummary: true };
-    },
-  };
-  const context = await chatContext.prepareRelevantChatModelContext([
-    textMessage("u1", "user", "Covered question"),
-    textMessage("a1", "assistant", "Covered answer"),
-    textMessage("u2", "user", "Previous question"),
-    textMessage("a2", "assistant", "Previous answer"),
-    textMessage("u3", "user", "Continue that solution"),
-  ], options);
-
-  assert.deepEqual(context.messages.map((message) => message.id), ["u1", "a1", "u2", "a2", "u3"]);
-  assert.equal(context.systemContext, undefined);
-  assert.equal(Object.hasOwn(evaluatedState ?? {}, "summary"), false);
-});
-
-test("relevant context evaluates six historical messages across three turns excluding the current message", () => withoutChatContextEnv(async () => {
-  process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "6";
-  const messages = [
-    textMessage("u1", "user", "oldest question"), textMessage("a1", "assistant", "oldest answer"),
-    textMessage("u2", "user", "second question"), textMessage("a2", "assistant", "second answer"),
-    textMessage("u3", "user", "third question"), textMessage("a3", "assistant", "third answer"),
-    textMessage("u4", "user", "fourth question"), textMessage("a4", "assistant", "fourth answer"),
-    textMessage("u5", "user", "fifth question"), textMessage("a5", "assistant", "fifth answer"),
-    textMessage("u6", "user", "current question"),
-  ];
-  let evaluatedState: chatContext.ChatHistoryRelevanceState | undefined;
-  await chatContext.prepareRelevantChatModelContext(messages, {
-    evaluateHistoryNeed: async (state) => {
-      evaluatedState = state;
-      return { messageIds: [] };
-    },
-  });
-
-  assert.deepEqual(evaluatedState?.recentTurns.map((turn) => turn.messages.map((message) => message.id)), [["u3", "a3"], ["u4", "a4"], ["u5", "a5"]]);
-  assert.equal(evaluatedState?.recentTurns[0]?.messages[0]?.role, "user");
-  assert.match(evaluatedState?.recentTurns[0]?.messages[0]?.text ?? "", /third question/);
-  assert.equal(evaluatedState?.recentTurns[0]?.messages[1]?.role, "assistant");
-  assert.match(evaluatedState?.recentTurns[2]?.messages[1]?.text ?? "", /fifth answer/);
-  assert.match(evaluatedState?.currentMessage ?? "", /current question/);
+test("context sends the latest six messages including the current user message", () => withoutChatContextEnv(async () => {
+  const messages = conversation(9);
+  const original = structuredClone(messages);
+  const context = await prepareChatModelContext(messages);
+  assert.deepEqual(context.messages.map((message) => message.id), ["m4", "m5", "m6", "m7", "m8", "m9"]);
+  assert.deepEqual(messages, original);
 }));
 
-test("relevant context sends only the current message when no historical messages are selected", async () => {
-  const messages = [textMessage("u1", "user", "Earlier"), textMessage("a1", "assistant", "Answer"), textMessage("u2", "user", "Follow-up")];
-  const context = await chatContext.prepareRelevantChatModelContext(messages, {
-    evaluateHistoryNeed: async () => ({ messageIds: [] }),
-  });
-  assert.deepEqual(context.messages, [messages[2]]);
-  assert.equal(context.systemContext, undefined);
+test("context sends all six messages when the count limit is exactly met", () => withoutChatContextEnv(async () => {
+  const messages = conversation(6);
+  assert.deepEqual((await prepareChatModelContext(messages)).messages, messages);
+}));
+
+test("context reads a custom message limit without expanding to complete historical turns", () => withoutChatContextEnv(async () => {
+  process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "4";
+  const context = await prepareChatModelContext(conversation(9));
+  assert.deepEqual(context.messages.map((message) => message.id), ["m6", "m7", "m8", "m9"]);
+}));
+
+test("context removes only the oldest message when six exceed 20K but five fit", () => withoutChatContextEnv(async () => {
+  const context = await prepareChatModelContext(conversation(7, "a ".repeat(3500)));
+  assert.deepEqual(context.messages.map((message) => message.id), ["m3", "m4", "m5", "m6", "m7"]);
+  assert.ok(context.tokenCount <= 20_000);
+}));
+
+test("context keeps removing oldest messages until the remaining four fit", () => withoutChatContextEnv(async () => {
+  const context = await prepareChatModelContext(conversation(7, "a ".repeat(4500)));
+  assert.deepEqual(context.messages.map((message) => message.id), ["m4", "m5", "m6", "m7"]);
+  assert.ok(context.tokenCount <= 20_000);
+}));
+
+test("token trimming also applies below the message-count limit", async () => {
+  const messages = [textMessage("u1", "user", "a ".repeat(20_000)), textMessage("a1", "assistant", "Short answer"), textMessage("u2", "user", "Follow-up")];
+  assert.deepEqual((await prepareChatModelContext(messages)).messages, messages.slice(1));
 });
 
-test("relevant context skips Jev when there is no prior history even if a saved summary exists", async () => {
-  let evaluations = 0;
-  const messages = [textMessage("u1", "user", "First question")];
-  const options = {
-    contextSummary: "Saved facts",
-    evaluateHistoryNeed: async () => { evaluations += 1; return { messageIds: [] }; },
-  };
-  const context = await chatContext.prepareRelevantChatModelContext(messages, options);
-  assert.equal(evaluations, 0);
-  assert.deepEqual(context.messages, messages);
+test("context retains the newest request when all history must be removed", async () => {
+  const messages = [textMessage("u1", "user", "a ".repeat(20_000)), textMessage("a1", "assistant", "a ".repeat(20_000)), textMessage("u2", "user", "Follow-up")];
+  assert.deepEqual((await prepareChatModelContext(messages)).messages, [messages[2]]);
 });
 
-test("relevant context uses one-turn fallback for malformed or unknown message selections", async () => {
-  const messages = [textMessage("u1", "user", "Old"), textMessage("a1", "assistant", "Old answer"), textMessage("u2", "user", "Previous"), textMessage("a2", "assistant", "Previous answer"), textMessage("u3", "user", "Current")];
-  const selections: unknown[] = [null, { messageIds: "u1" }, { messageIds: ["unknown"] }, { messageIds: [1] }];
-  for (const selection of selections) {
-    const context = await chatContext.prepareRelevantChatModelContext(messages, {
-      evaluateHistoryNeed: async () => selection as chatContext.ChatHistorySelection,
-    });
-    assert.deepEqual(context.messages.map((message) => message.id), ["u2", "a2", "u3"]);
-    assert.equal(context.systemContext, undefined);
+test("context rejects a newest message that alone exceeds its token budget", async () => {
+  await assert.rejects(prepareChatModelContext([textMessage("u1", "user", "a ".repeat(20_000))]), /exceeds.*token.*budget/i);
+});
+
+test("context accepts the exact token budget and removes oldest content one token over it", async () => {
+  // o200k_base tokenizes each of these serialized role/parts objects into 17 tokens.
+  const messages = [textMessage("u1", "user", "Hello"), textMessage("u2", "user", "Hello")];
+  assert.deepEqual((await prepareChatModelContext(messages, { maxTokens: 34 })).messages, messages);
+  assert.deepEqual((await prepareChatModelContext(messages, { maxTokens: 33 })).messages, [messages[1]]);
+});
+
+test("context reads a separate token limit and falls back for invalid configuration", () => withoutChatContextEnv(async () => {
+  const previous = process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS;
+  try {
+    process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS = "33";
+    const messages = [textMessage("u1", "user", "Hello"), textMessage("u2", "user", "Hello")];
+    assert.deepEqual((await prepareChatModelContext(messages)).messages, [messages[1]]);
+    for (const invalid of ["0", "-1", "NaN", "1.5", "Infinity"]) {
+      assert.equal(getChatContextConfig({ BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS: invalid }).maxTokens, 20_000);
+    }
+  } finally {
+    if (previous === undefined) delete process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS;
+    else process.env.BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS = previous;
   }
+}));
+
+test("context preserves raw attachments and tool results while counting their content", async () => {
+  const attachment: UIMessage = { id: "u1", role: "user", parts: [{ type: "file", mediaType: "image/png", url: "https://example.com/image.png", filename: "image.png" }] };
+  const tool: UIMessage = { id: "a1", role: "assistant", parts: [{ type: "tool-clock", toolCallId: "clock-1", state: "output-available", input: {}, output: { time: "12:00" } }] };
+  const messages = [attachment, tool, textMessage("u2", "user", "Continue")];
+  const context = await prepareChatModelContext(messages);
+  assert.deepEqual(context.messages, messages);
+  assert.equal(context.messages[0], attachment);
+  assert.equal(context.messages[1], tool);
+  const largeTool: UIMessage = { ...tool, parts: [{ type: "tool-clock", toolCallId: "clock-1", state: "output-available", input: {}, output: { content: "a ".repeat(20_000) } }] };
+  assert.deepEqual((await prepareChatModelContext([attachment, largeTool, messages[2]])).messages, [messages[2]]);
 });
 
-test("relevant context preserves assistant tool continuation in the current turn on fallback", async () => {
-  const messages: UIMessage[] = [
-    textMessage("u1", "user", "Previous question"),
-    textMessage("a1", "assistant", "Previous answer"),
-    textMessage("u2", "user", "Current question"),
-    { id: "a2", role: "assistant", parts: [{ type: "tool-clock", toolCallId: "clock-1", state: "output-available", input: {}, output: { time: "12:00" } }] },
-  ];
-  const context = await chatContext.prepareRelevantChatModelContext(messages, {
-    evaluateHistoryNeed: async () => { throw new Error("timeout"); },
-  });
-  assert.deepEqual(context.messages, messages);
+test("context never drops the current user message to retain only its tool continuation", async () => {
+  const messages = [textMessage("u1", "user", "Current request"), textMessage("a1", "assistant", "Tool continuation")];
+  assert.deepEqual((await prepareChatModelContext(messages, { maxMessages: 1 })).messages, messages);
+  await assert.rejects(prepareChatModelContext(messages, { maxTokens: 20 }), /exceeds.*token.*budget/i);
 });
 
-test("relevant context includes selected complete turns in chronological order without duplicates", () => withoutChatContextEnv(async () => {
-  process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "8";
-  const messages = [
-    textMessage("u1", "user", "First question"), textMessage("a1", "assistant", "First answer"),
-    textMessage("u2", "user", "Second question"), textMessage("a2", "assistant", "Second answer"),
-    textMessage("u3", "user", "Third question"), textMessage("a3", "assistant", "Third answer"),
-    textMessage("u4", "user", "Fourth question"), textMessage("a4", "assistant", "Fourth answer"),
-    textMessage("u5", "user", "Current question"),
-  ];
-  const context = await chatContext.prepareRelevantChatModelContext(messages, {
-    evaluateHistoryNeed: async () => ({ messageIds: ["a3", "u2", "a2"] }),
-  });
-
-  assert.deepEqual(context.messages.map((message) => message.id), ["u2", "a2", "u3", "a3", "u5"]);
-  assert.equal(context.systemContext, undefined);
-}));
-
-test("relevant context reads the candidate window from BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT", () => withoutChatContextEnv(async () => {
-  process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "2";
-  const messages = [
-    textMessage("u1", "user", "Old question"), textMessage("a1", "assistant", "Old answer"),
-    textMessage("u2", "user", "Second question"), textMessage("a2", "assistant", "Second answer"),
-    textMessage("u3", "user", "Third question"), textMessage("a3", "assistant", "Third answer"),
-    textMessage("u4", "user", "Current question"),
-  ];
-  let candidateIds: string[] = [];
-  const context = await chatContext.prepareRelevantChatModelContext(messages, {
-    evaluateHistoryNeed: async (state) => {
-      candidateIds = state.recentTurns.flatMap((turn) => turn.messages.map((message) => message.id));
-      return { messageIds: ["a3"] };
-    },
-  });
-
-  assert.deepEqual(candidateIds, ["u3", "a3"]);
-  assert.deepEqual(context.messages.map((message) => message.id), ["u3", "a3", "u4"]);
-}));
-
-test("relevant context expands an odd message limit to include the complete boundary turn", () => withoutChatContextEnv(async () => {
-  process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "3";
-  const messages = [
-    textMessage("u1", "user", "Old question"), textMessage("a1", "assistant", "Old answer"),
-    textMessage("u2", "user", "Second question"), textMessage("a2", "assistant", "Second answer"),
-    textMessage("u3", "user", "Third question"), textMessage("a3", "assistant", "Third answer"),
-    textMessage("u4", "user", "Current question"),
-  ];
-  let candidateIds: string[] = [];
-  const context = await chatContext.prepareRelevantChatModelContext(messages, {
-    evaluateHistoryNeed: async (state) => {
-      candidateIds = state.recentTurns.flatMap((turn) => turn.messages.map((message) => message.id));
-      return { messageIds: ["a2"] };
-    },
-  });
-
-  assert.deepEqual(candidateIds, ["u2", "a2", "u3", "a3"]);
-  assert.deepEqual(context.messages.map((message) => message.id), ["u2", "a2", "u4"]);
-}));
-
-test("relevant context groups multiple assistant replies and preserves their raw tool parts", () => withoutChatContextEnv(async () => {
-  process.env.BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT = "1";
-  const toolReply: UIMessage = {
-    id: "a1-tool", role: "assistant",
-    parts: [{ type: "tool-clock", toolCallId: "clock-1", state: "output-available", input: {}, output: { time: "12:00" } }],
-  };
-  const messages = [
-    textMessage("u1", "user", "What time is it?"),
-    toolReply,
-    textMessage("a1", "assistant", "It is 12:00."),
-    textMessage("u2", "user", "What was that time?"),
-  ];
-  let evaluatedState: chatContext.ChatHistoryRelevanceState | undefined;
-  const context = await chatContext.prepareRelevantChatModelContext(messages, {
-    evaluateHistoryNeed: async (state) => {
-      evaluatedState = state;
-      return { messageIds: ["a1"] };
-    },
-  });
-  assert.deepEqual(evaluatedState?.recentTurns.map((turn) => turn.messages.map((message) => message.id)), [["u1", "a1-tool", "a1"]]);
+test("context counts Unicode and special-token-looking content without changing it", async () => {
+  const messages = [textMessage("u1", "user", "请解释这段代码 👩🏽‍💻 <|endoftext|>")];
+  const context = await prepareChatModelContext(messages);
   assert.deepEqual(context.messages, messages);
-  assert.equal(context.messages[1], toolReply);
-}));
+  assert.ok(context.tokenCount > 0);
+});
+
+test("context ignores stored total-usage metadata when budgeting current content", async () => {
+  const messages = [{ ...textMessage("u1", "user", "Hello"), metadata: { totalTokens: 900_000 } }];
+  assert.deepEqual((await prepareChatModelContext(messages, { maxTokens: 17 })).messages, messages);
+});
+
+test("context handles empty input without returning a phantom message", async () => {
+  const context = await prepareChatModelContext([]);
+  assert.deepEqual(context.messages, []);
+  assert.equal(context.tokenCount, 0);
+});

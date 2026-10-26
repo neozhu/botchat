@@ -20,7 +20,7 @@ test("batch summary helper owns generation, session update, and message marking"
   assert.match(helperSource, /p_ui_message_ids/);
 });
 
-test("message sync owns summary persistence while chat only selects relevant messages", () => {
+test("message sync owns summary persistence while chat applies the context budget", () => {
   const chatRouteSource = readFileSync(
     fileURLToPath(new URL("../../app/api/chat/route.ts", import.meta.url)),
     "utf8"
@@ -30,7 +30,7 @@ test("message sync owns summary persistence while chat only selects relevant mes
     "utf8"
   );
 
-  assert.match(chatRouteSource, /prepareRelevantChatModelContext\(/);
+  assert.match(chatRouteSource, /prepareChatModelContext\(/);
   assert.doesNotMatch(chatRouteSource, /persistConversationSummaryBatches\(/);
   assert.match(syncRouteSource, /persistConversationSummaryBatches\(/);
   assert.doesNotMatch(

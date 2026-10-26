@@ -34,7 +34,7 @@ Download the HTML and open it in a browser to explore component details, pinned 
 
 - **Server bootstrap**: `app/page.tsx` verifies the Supabase user and redirects guests to `/auth`. `lib/botchat/bootstrap.ts` loads experts, sessions, and the active conversation before rendering the dashboard.
 - **Client chat flow**: `components/botchat/dashboard.tsx` coordinates `SessionsPanel`, `ChatPanel`, `useChat`, session switching, optimistic updates, uploads, and debounced message persistence. Chat rendering reuses `ai-elements` and shared `ui` components.
-- **API and model context**: `/api/chat` resolves the expert prompt, model, and reasoning effort, loads referenced local skills, selects relevant history through optional TypeSafe/Jev evaluation, and streams OpenAI replies. Missing or failed Jev evaluation falls back to the previous turn and current message. Separate routes handle sessions, experts, prompt generation, and configurable ASR/TTS services.
+- **API and model context**: `/api/chat` resolves the expert prompt, model, and reasoning effort, loads referenced local skills, keeps the latest configured messages within a local token budget, and streams OpenAI replies. Separate routes handle sessions, experts, prompt generation, and configurable ASR/TTS services.
 - **Persistence and attachments**: Supabase Postgres stores shared experts and user-owned sessions/messages protected by RLS. `/api/messages/sync` saves messages, titles, previews, token totals, and complete summary batches; saved summaries support session search and are excluded from chat context. `/api/attachments/upload` stores files in the public `chat-attachments` bucket and returns URLs before the client sends the message.
 
 ## Quickstart (local)
@@ -55,16 +55,20 @@ Required:
 Optional saved conversation summaries:
 
 - `OPENAI_CONVERSATION_SUMMARY_MODEL` – model used for session title and context summary generation; falls back to `OPENAI_MODEL`
-- `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT` – despite the retained variable name, counts all user and assistant messages. It controls both the number of messages per saved summary batch and the maximum number of historical messages considered for relevance selection, excluding the current turn; defaults to `6` (normally three user/assistant turns). Set it to `8` for four turns.
+- `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT` – despite the retained variable name, counts all user and assistant messages. It controls both the number of messages per saved summary batch and the maximum number of messages sent to the chat model, including the current user message; defaults to `6`.
 
-After messages are saved, each full batch is summarized independently and marked as summarized. With a batch size of `6`, messages 1–6 form one summary and messages 7–12 form the next; incomplete batches wait for more messages. Each summary replaces the session's `context_summary` field without combining it with the previous summary. Summary generation uses only message count; the former `BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS` setting is ignored.
+After messages are saved, each full batch is summarized independently and marked as summarized. With a batch size of `6`, messages 1–6 form one summary and messages 7–12 form the next; incomplete batches wait for more messages. Each summary replaces the session's `context_summary` field without combining it with the previous summary. Summary generation uses only message count; `BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS` limits chat context and does not trigger summary generation.
 
-Optional history relevance routing:
+Chat context limits:
 
-- `TYPESAFE_API_KEY` – server-only TypeSafe key for Jev to evaluate each historical message within the configured conversation window against the current message
-- `TYPESAFE_MODEL` – Jev model for history relevance evaluation; defaults to `jev-latest`
+- `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT` – maximum recent messages, including the current user message; defaults to `6`. Counts individual user/assistant messages, not complete turns.
+- `BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS` – local token budget for those messages; defaults to `20000`.
 
-One Jev request batches an individual question for each historical message. Only messages with a Noul true probability of at least `0.9` are sent to the chat model, in chronological order; selecting one message does not include its entire turn or the other turns. Lower probabilities are treated as unrelated and discarded, without triggering fallback. Saved summaries are not sent to Jev or the chat model. If Jev fails, times out after 5 seconds, or its key is missing, the request includes only the previous conversation turn and the current message. Summary generation and message persistence continue regardless of this selection.
+For each request, the server starts with the latest configured number of messages, then removes the oldest message one at a time (6 → 5 → 4 → …) until their estimated total is at most the token budget. The remaining messages keep their original order and content. There is no Jev/TypeSafe relevance call or API key requirement. Saved summaries are not added to the chat context, and summary generation and message persistence continue independently.
+
+The current user message and any following tool continuation are always kept together, even if that current turn exceeds the message-count limit. If the current request alone exceeds the token budget, the API returns HTTP 413 asking the user to shorten it; it never silently drops or truncates the current request.
+
+Token budgeting uses the local `o200k_base` tokenizer on each message's serialized role and parts, including text, file descriptors, and tool inputs/results. Stored usage metadata is ignored. This is an estimate for message content, not a cap on the provider's full input or billed usage: system/skill instructions, tool declarations, generated output, and provider-side image/PDF processing are outside this budget.
 
 Supabase (recommended for sessions/experts/attachments):
 
@@ -112,7 +116,7 @@ docker compose up -d --build
 
 App is exposed at `http://localhost:3202` (mapped from container `3000`).
 
-Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_CONVERSATION_SUMMARY_MODEL`, `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT`, `TYPESAFE_API_KEY`, `TYPESAFE_MODEL`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in your deployment platform or `docker-compose.yml`.
+Tip: for Docker envs, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_CONVERSATION_SUMMARY_MODEL`, `BOTCHAT_COMPACT_AFTER_USER_MESSAGE_COUNT`, `BOTCHAT_COMPACT_AFTER_TOTAL_TOKENS`, `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in your deployment platform or `docker-compose.yml`.
 
 ## Project structure
 

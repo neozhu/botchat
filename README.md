@@ -114,6 +114,7 @@ This repo includes a production Docker build for the Next.js app:
 docker compose up -d --build
 ```
 
+Typography uses a bundled Geist Sans variable font for Latin text and system fonts for Chinese (PingFang SC, Microsoft YaHei, or Noto Sans CJK SC). Font loading does not require access to Google Fonts during build or at runtime. The font source and SIL Open Font License are included in `public/fonts/geist/`.
 
 App is exposed at `http://localhost:3202` (mapped from container `3000`).
 

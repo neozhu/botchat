@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Noto_Sans_SC } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 const siteUrl =
@@ -8,22 +8,12 @@ const siteUrl =
     ? `https://${process.env.VERCEL_URL}`
     : "http://localhost:3000");
 
-const displayFont = Inter({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const bodyFont = Inter({
-  variable: "--font-body",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-
-const cjkBodyFont = Noto_Sans_SC({
-  variable: "--font-cjk",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+const geistFont = localFont({
+  src: "../public/fonts/geist/Geist-Variable.woff2",
+  variable: "--font-geist",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -85,12 +75,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${displayFont.variable} ${bodyFont.variable} ${cjkBodyFont.variable} antialiased`}
-      >
-        {children}
-      </body>
+    <html lang="en" className={geistFont.variable}>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

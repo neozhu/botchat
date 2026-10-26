@@ -837,11 +837,11 @@ export function ExpertSettingsDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="!w-[calc(100vw-2rem)] !max-w-[calc(100vw-2rem)] sm:!max-w-[min(100vw-2rem,1400px)] max-h-[92vh] overflow-auto border-white/60 bg-[var(--panel-strong)]/90 p-0 shadow-[0_40px_120px_-70px_rgba(20,20,60,0.75)] backdrop-blur"
+          className="!w-[calc(100vw-2rem)] !max-w-[calc(100vw-2rem)] sm:!max-w-[min(100vw-2rem,1400px)] max-h-[92vh] overflow-auto border-white/60 bg-[var(--panel-strong)]/90 p-0 shadow-[0_40px_120px_-70px_rgba(20,20,60,0.75)] backdrop-blur md:h-[min(92vh,900px)] md:overflow-hidden"
           showCloseButton
         >
-          <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] xl:grid-cols-[420px_1fr]">
-            <div className="flex flex-col border-b border-white/30 bg-white/70 p-4 md:border-b-0 md:border-r">
+          <div className="grid grid-cols-1 md:h-full md:min-h-0 md:grid-cols-[360px_1fr] md:grid-rows-[minmax(0,1fr)] xl:grid-cols-[420px_1fr]">
+            <div className="flex flex-col border-b border-white/30 bg-white/70 p-4 md:min-h-0 md:overflow-y-auto md:border-b-0 md:border-r">
               <div className="flex items-start justify-between gap-3">
                 <DialogHeader className="text-left">
                   <DialogTitle className="font-[var(--font-display)] tracking-tight">
@@ -890,7 +890,7 @@ export function ExpertSettingsDialog({
                 onDragEnd={(event) => void handleDragEnd(event)}
                 onDragCancel={handleDragCancel}
               >
-                <ScrollArea className="h-[30vh] pr-2 md:h-[38vh]">
+                <ScrollArea className="h-[30vh] pr-2 md:h-auto md:min-h-32 md:flex-1">
                   <div className="space-y-2">
                     {isLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
@@ -943,12 +943,12 @@ export function ExpertSettingsDialog({
                     )
                   : null}
               </DndContext>
-              <div className="mt-auto">
+              <div className="mt-auto shrink-0">
                 <ExpertTokenUsage open={open} experts={experts} />
               </div>
             </div>
 
-            <div className="p-5 pr-14 md:p-6 md:pr-16">
+            <div className="p-5 pr-14 md:min-h-0 md:overflow-y-auto md:p-6 md:pr-16">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">

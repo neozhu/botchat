@@ -10,7 +10,7 @@ import type {
 } from "react";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import {
   Conversation,
   ConversationContent,
@@ -38,7 +38,8 @@ import {
   shouldPreventClipboardPasteDefault,
 } from "@/lib/botchat/chat-clipboard";
 import { getComposerTextareaSizing } from "@/lib/botchat/chat-composer";
-import { extractEnglishSpeechText } from "@/lib/botchat/tts-text";
+import { ResponseActions } from "@/components/botchat/response-actions";
+import { AssistantBlockquote } from "@/components/botchat/assistant-blockquote";
 import { formatTimelineDay, getTimelineDayKey } from "@/lib/botchat/chat-timeline";
 import { VoiceInputButton } from "@/components/botchat/VoiceInputButton";
 import {
@@ -49,10 +50,8 @@ import {
 import { cn } from "@/lib/utils";
 import {
   Brain,
-  Check,
   ChevronLeft,
   ChevronRight,
-  Copy,
   Globe,
   Info,
   Loader2,
@@ -60,7 +59,6 @@ import {
   MoreHorizontal,
   Paperclip,
   Send,
-  Volume2,
   X,
 } from "lucide-react";
 
@@ -86,8 +84,6 @@ type ChatTimelineItem =
       key: string;
       message: UIMessage;
     };
-
-type SpeechState = "idle" | "loading" | "playing";
 
 export type ChatPanelProps = {
   botName: string;
@@ -173,36 +169,7 @@ function ToolbarIcon({
   );
 }
 
-function SpeechWaveformIcon() {
-  const shouldReduceMotion = useReducedMotion();
-
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 14 14"
-      fill="none"
-      className="h-3.5 w-3.5 overflow-hidden"
-    >
-      <motion.path
-        d="M0 7H2L3 6L4 9L5.5 2L7 12L8.5 7H14M14 7H16L17 6L18 9L19.5 2L21 12L22.5 7H28"
-        stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        animate={shouldReduceMotion ? undefined : { x: [0, -14] }}
-        transition={
-          shouldReduceMotion
-            ? undefined
-            : {
-                duration: 1.15,
-                ease: "linear",
-                repeat: Infinity,
-              }
-        }
-      />
-    </svg>
-  );
-}
+const assistantMarkdownComponents = { blockquote: AssistantBlockquote };
 
 const MessageBubble = memo(function MessageBubble({
   message,
@@ -215,13 +182,6 @@ const MessageBubble = memo(function MessageBubble({
   const isUser = message.role === "user";
   const hasText = text.trim().length > 0;
   const canCopyResponse = !isUser && hasText;
-  const speechInput = useMemo(() => isUser ? "" : extractEnglishSpeechText(text), [isUser, text]);
-  const [copied, setCopied] = useState(false);
-  const [speechState, setSpeechState] = useState<SpeechState>("idle");
-  const resetCopyStateTimeoutRef = useRef<number | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
-  const speechAbortControllerRef = useRef<AbortController | null>(null);
   const parts = (message as UIMessage).parts ?? [];
   const fileParts = parts.filter((part) => part.type === "file") as Array<{
     type: "file";
@@ -230,119 +190,7 @@ const MessageBubble = memo(function MessageBubble({
     url: string;
   }>;
 
-  useEffect(() => {
-    return () => {
-      if (resetCopyStateTimeoutRef.current) {
-        window.clearTimeout(resetCopyStateTimeoutRef.current);
-      }
-      speechAbortControllerRef.current?.abort();
-      audioRef.current?.pause();
-      if (audioUrlRef.current) {
-        URL.revokeObjectURL(audioUrlRef.current);
-      }
-    };
-  }, []);
-
-  const resetSpeech = () => {
-    speechAbortControllerRef.current?.abort();
-    speechAbortControllerRef.current = null;
-    audioRef.current?.pause();
-    audioRef.current = null;
-
-    if (audioUrlRef.current) {
-      URL.revokeObjectURL(audioUrlRef.current);
-      audioUrlRef.current = null;
-    }
-
-    setSpeechState("idle");
-  };
-
-  const handleCopy = async () => {
-    if (!text.trim()) return;
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-
-      if (resetCopyStateTimeoutRef.current) {
-        window.clearTimeout(resetCopyStateTimeoutRef.current);
-      }
-
-      resetCopyStateTimeoutRef.current = window.setTimeout(() => {
-        setCopied(false);
-      }, 1600);
-    } catch (error) {
-      console.error("Failed to copy assistant response", error);
-    }
-  };
-
-  const handleReadResponse = async () => {
-    const input = speechInput;
-    if (!input || speechState !== "idle") return;
-
-    const abortController = new AbortController();
-    speechAbortControllerRef.current = abortController;
-    setSpeechState("loading");
-
-    try {
-      const response = await fetch("/api/audio/speech", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ input }),
-        signal: abortController.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`TTS request failed with status ${response.status}`);
-      }
-
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-
-      audioUrlRef.current = audioUrl;
-      audioRef.current = audio;
-
-      const handlePlaybackDone = () => {
-        if (audioRef.current === audio) {
-          audioRef.current = null;
-        }
-
-        if (audioUrlRef.current === audioUrl) {
-          URL.revokeObjectURL(audioUrl);
-          audioUrlRef.current = null;
-        }
-
-        setSpeechState("idle");
-      };
-
-      audio.addEventListener("ended", handlePlaybackDone, { once: true });
-      audio.addEventListener("error", handlePlaybackDone, { once: true });
-      setSpeechState("playing");
-      await audio.play();
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        console.error("Failed to play assistant response", error);
-      }
-      resetSpeech();
-    } finally {
-      if (speechAbortControllerRef.current === abortController) {
-        speechAbortControllerRef.current = null;
-      }
-    }
-  };
-
   if (!hasText && fileParts.length === 0) return null;
-
-  const speechLabel =
-    speechState === "loading"
-      ? "Preparing speech"
-      : speechState === "playing"
-        ? "Reading response aloud"
-        : speechInput ? "Read response aloud" : "No English text to read";
-  const isSpeechActive = speechState !== "idle";
 
   return (
     <div
@@ -375,6 +223,7 @@ const MessageBubble = memo(function MessageBubble({
           <div className="space-y-3">
             {text ? (
               <MessageResponse
+                components={isUser ? undefined : assistantMarkdownComponents}
                 className={cn(
                   "text-sm leading-relaxed",
                   "[&_a]:underline [&_a]:underline-offset-4",
@@ -442,47 +291,8 @@ const MessageBubble = memo(function MessageBubble({
         </div>
 
         {canCopyResponse ? (
-          <div className="absolute right-2 bottom-2 flex items-center gap-1">
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              aria-label={speechLabel}
-              disabled={isSpeechActive || !speechInput}
-              className={cn(
-                "h-7 w-7 rounded-full border border-white/12 bg-black/20 text-white/80 opacity-0 shadow-sm backdrop-blur-sm transition-opacity duration-150 pointer-events-none group-hover/message:opacity-100 group-hover/message:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:bg-black/30 hover:text-white [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 disabled:pointer-events-none disabled:opacity-100",
-                isSpeechActive &&
-                  "opacity-100 pointer-events-auto border-[var(--accent-line)]/40 bg-white/90 text-[var(--accent-line)] hover:bg-white"
-              )}
-              onClick={() => void handleReadResponse()}
-            >
-              {speechState === "loading" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : speechState === "playing" ? (
-                <SpeechWaveformIcon />
-              ) : (
-                <Volume2 className="h-3.5 w-3.5" />
-              )}
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              aria-label={copied ? "Copied" : "Copy response"}
-              className={cn(
-                "h-7 w-7 rounded-full border border-white/12 bg-black/20 text-white/80 opacity-0 shadow-sm backdrop-blur-sm transition-opacity duration-150 pointer-events-none group-hover/message:opacity-100 group-hover/message:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:bg-black/30 hover:text-white [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100",
-                copied &&
-                  "opacity-100 pointer-events-auto border-[var(--accent-line)]/40 bg-white/90 text-[var(--accent-line)] hover:bg-white"
-              )}
-              onClick={() => void handleCopy()}
-            >
-              {copied ? (
-                <Check className="h-3.5 w-3.5" />
-              ) : (
-                <Copy className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          </div>
+          <ResponseActions text={text}
+            className="absolute right-2 bottom-2 opacity-0 pointer-events-none transition-opacity group-hover/message:opacity-100 group-hover/message:pointer-events-auto group-focus-within/message:opacity-100 group-focus-within/message:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto" />
         ) : null}
       </div>
     </div>

@@ -19,7 +19,7 @@ Built with **Next.js (App Router)** + **Vercel AI SDK** + **Supabase**.
 - **Multi-session chat**: sessions list + titles + last-message preview.
 - **User-isolated chat history**: sessions and messages are scoped to the authenticated user.
 - **Streaming responses**: responsive UI while the model streams tokens.
-- **English read-aloud**: the speaker action sends only English text from mixed Chinese/English replies to the speech API. It is disabled when no English is available; the server also filters and rejects Chinese-only input.
+- **English read-aloud**: the speaker action sends only English text from mixed Chinese/English replies to the speech API. It is disabled when no English is available; the server also filters and rejects Chinese-only input. Each blockquote in an assistant reply has its own read-aloud and copy actions, shown on hover, keyboard focus, or touch devices. Copy retains the full quote text, including Chinese; starting another read-aloud stops the previous one.
 - **Attachments**: upload images/files to Supabase Storage and send them with messages.
 - **Markdown + code blocks**: readable rendering with syntax highlighting.
 
